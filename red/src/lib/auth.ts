@@ -11,7 +11,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   callbacks: {
     async session({ session, token }) {
       // Agregar información adicional a la sesión
-      if (token.sub) {
+      if (token.sub && session.user) {
         session.user.id = token.sub;
       }
       return session;
