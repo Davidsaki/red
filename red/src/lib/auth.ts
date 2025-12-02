@@ -1,6 +1,19 @@
-// src/lib/auth.ts - Versión corregida
-import NextAuth from 'next-auth';
+import NextAuth, { DefaultSession, DefaultUser } from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
+import { JWT } from 'next-auth/jwt';
+
+// Extender tipos
+declare module 'next-auth' {
+  interface Session {
+    user: {
+      id: string;
+    } & DefaultSession['user'];
+  }
+
+  interface User extends DefaultUser {
+    id: string;
+  }
+}
 
 const authOptions = {
   providers: [
@@ -10,7 +23,7 @@ const authOptions = {
     }),
   ],
   callbacks: {
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: JWT }) {
       if (token.sub && session?.user) {
         session.user.id = token.sub;
       }
@@ -19,5 +32,4 @@ const authOptions = {
   },
 };
 
-// Exportar handlers
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
