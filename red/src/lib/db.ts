@@ -1,8 +1,17 @@
 import { Pool } from 'pg';
 
+// Get connection string from environment
+const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error(
+    'Database connection string not found. Please set POSTGRES_URL or DATABASE_URL environment variable.'
+  );
+}
+
 // Create a PostgreSQL connection pool
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL,
+  connectionString,
   ssl: {
     rejectUnauthorized: false, // Required for Prisma Postgres
   },
