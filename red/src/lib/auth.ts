@@ -61,12 +61,13 @@ export const authOptions: NextAuthOptions = {
       if (session.user?.email) {
         try {
           const result = await sql`
-            SELECT id, subscription_tier FROM users WHERE email = ${session.user.email}
+            SELECT id, subscription_tier, role FROM users WHERE email = ${session.user.email}
           `;
 
           if (result.rows.length > 0) {
             session.user.id = result.rows[0].id.toString();
             session.user.subscription = result.rows[0].subscription_tier;
+            session.user.role = result.rows[0].role;
           }
         } catch (error) {
           console.error('Error fetching user from database:', error);

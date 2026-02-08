@@ -33,11 +33,17 @@ export default function Home() {
             La plataforma donde empresas encuentran freelancers y freelancers encuentran proyectos increíbles.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 font-medium text-lg"
             >
               Comenzar Gratis
+            </Link>
+            <Link
+              href="/projects"
+              className="bg-white text-blue-600 px-8 py-4 rounded-lg hover:bg-gray-50 font-medium text-lg border border-blue-200"
+            >
+              Ver Proyectos
             </Link>
           </div>
         </div>
