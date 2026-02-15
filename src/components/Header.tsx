@@ -5,8 +5,9 @@ import { useSession, signOut } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
 
 export default function Header() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const pathname = usePathname();
+  const isLoading = status === 'loading';
 
   return (
     <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-10">
@@ -26,7 +27,9 @@ export default function Header() {
             >
               Proyectos
             </Link>
-            {session ? (
+            {isLoading ? (
+              <div className="w-20 h-8" />
+            ) : session ? (
               <>
                 <Link
                   href="/dashboard"
