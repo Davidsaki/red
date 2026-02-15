@@ -6,6 +6,7 @@ import CurrencyDisplay from "@/components/CurrencyDisplay";
 import ProjectCarousel from "@/components/ProjectCarousel";
 import DashboardSearch from "@/components/DashboardSearch";
 import CollapsibleSection from "@/components/CollapsibleSection";
+import Header from "@/components/Header";
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -67,8 +68,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Header />
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        {/* Compact Header */}
+        {/* Welcome + Publish */}
         <div className="bg-white rounded-lg shadow px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -83,25 +85,12 @@ export default async function DashboardPage() {
                 Bienvenido, {session.user?.name}
               </h1>
             </div>
-            <div className="flex items-center gap-3">
-              <Link
-                href="/dashboard/projects/new"
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                + Publicar
-              </Link>
-              <form action="/api/auth/signout" method="POST">
-                <button
-                  type="submit"
-                  className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                  title="Cerrar sesión"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                  </svg>
-                </button>
-              </form>
-            </div>
+            <Link
+              href="/dashboard/projects/new"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            >
+              + Publicar
+            </Link>
           </div>
         </div>
 

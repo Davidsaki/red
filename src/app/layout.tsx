@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "RED - Freelance Marketplace",
-  description: "Connect with projects and talent",
+  title: "RDC - Red de Contratistas",
+  description: "Conecta con proyectos y talentos",
 };
 
 export default function RootLayout({

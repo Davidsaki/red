@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CurrencyDisplay from '@/components/CurrencyDisplay';
 import ProjectActions from '@/components/ProjectActions';
+import Header from '@/components/Header';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -89,24 +90,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
   return (
     <div className="min-h-screen bg-gray-50/80">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex justify-between items-center h-14">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              RED
-            </Link>
-            <nav className="flex items-center gap-1">
-              <Link href="/projects" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                Proyectos
-              </Link>
-              <Link href="/dashboard" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                Dashboard
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         {/* Back link */}

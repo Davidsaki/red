@@ -3,6 +3,7 @@ import Link from 'next/link';
 import ProjectCard from '@/components/ProjectCard';
 import ProjectFilters from '@/components/ProjectFilters';
 import Pagination from '@/components/Pagination';
+import Header from '@/components/Header';
 import { Suspense } from 'react';
 
 interface ProjectsPageProps {
@@ -102,36 +103,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <Link href="/" className="text-2xl font-bold text-gray-900">
-              RED
-            </Link>
-            <nav className="flex items-center space-x-4">
-              <Link
-                href="/projects"
-                className="text-blue-600 font-medium"
-              >
-                Proyectos
-              </Link>
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-blue-600"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/login"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Iniciar Sesión
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
@@ -144,7 +116,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters */}
           <aside className="w-full lg:w-72 shrink-0">
-            <div className="bg-white rounded-lg shadow p-5 sticky top-8">
+            <div className="bg-white rounded-lg shadow p-5 sticky top-[72px]">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
               <Suspense fallback={<div>Cargando filtros...</div>}>
                 <ProjectFilters categories={categories} />
