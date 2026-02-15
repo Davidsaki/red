@@ -17,7 +17,7 @@ export type ProjectFormData = z.infer<typeof projectSchema>;
 export const applicationSchema = z.object({
   project_id: z.number().positive(),
   proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres'),
-  bid: z.number().positive('La oferta debe ser un número positivo'),
+  bid: z.number().positive('La oferta debe ser un número positivo').optional(),
 });
 
 export type ApplicationFormData = z.infer<typeof applicationSchema>;

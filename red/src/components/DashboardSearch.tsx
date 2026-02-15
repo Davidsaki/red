@@ -28,8 +28,8 @@ export default function DashboardSearch({ categories }: DashboardSearchProps) {
     router.push(`/projects?${params.toString()}`);
   }
 
-  function handleCategoryClick(slug: string): void {
-    router.push(`/projects?category=${slug}`);
+  function handleCategoryClick(categoryName: string): void {
+    router.push(`/projects?category=${encodeURIComponent(categoryName)}`);
   }
 
   function handleViewAll(): void {
@@ -71,7 +71,7 @@ export default function DashboardSearch({ categories }: DashboardSearchProps) {
           <button
             key={cat.id}
             type="button"
-            onClick={() => handleCategoryClick(cat.slug)}
+            onClick={() => handleCategoryClick(cat.name)}
             className="px-3 py-1.5 text-sm font-medium bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200 transition-colors"
           >
             {cat.name}

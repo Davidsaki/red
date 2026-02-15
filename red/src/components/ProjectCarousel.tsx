@@ -14,6 +14,7 @@ interface Project {
   created_at: string;
   employer_name?: string;
   status: string;
+  application_count?: number;
 }
 
 interface ProjectCarouselProps {

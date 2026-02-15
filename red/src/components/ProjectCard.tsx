@@ -14,6 +14,7 @@ interface ProjectCardProps {
     created_at: string;
     employer_name?: string;
     status: string;
+    application_count?: number;
   };
 }
 
@@ -81,9 +82,20 @@ export default function ProjectCard({ project }: ProjectCardProps) {
       )}
 
       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-        <div className="text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
           {project.employer_name && <span>Por {project.employer_name} · </span>}
           {timeAgo(project.created_at)}
+          {Number(project.application_count) > 0 && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+              title={`${project.application_count} aplicación${Number(project.application_count) !== 1 ? 'es' : ''}`}
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              {project.application_count}
+            </span>
+          )}
         </div>
         <Link
           href={`/projects/${project.id}`}

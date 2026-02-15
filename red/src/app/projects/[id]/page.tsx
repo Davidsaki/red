@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import CurrencyDisplay from '@/components/CurrencyDisplay';
+import ProjectActions from '@/components/ProjectActions';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +23,13 @@ function timeAgo(dateStr: string): string {
   if (diffMins > 0) return `hace ${diffMins} minuto(s)`;
   return 'ahora mismo';
 }
+
+const statusConfig: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+  open: { label: 'Abierto', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
+  closed: { label: 'Cerrado', dot: 'bg-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
+  completed: { label: 'Completado', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
+  cancelled: { label: 'Cancelado', dot: 'bg-gray-400', bg: 'bg-gray-50', text: 'text-gray-600' },
+};
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = await params;
@@ -47,26 +55,52 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   const isOwner = session?.user?.id === project.employer_id?.toString();
   const isAuthenticated = !!session?.user;
 
+  // Check if user already applied and fetch their application
+  let hasApplied = false;
+  let userApplication: { id: number; proposal: string; bid: string | null; status: string; created_at: string } | null = null;
+  if (isAuthenticated) {
+    const userResult = await sql`SELECT id FROM users WHERE email = ${session!.user.email}`;
+    if (userResult.rows.length > 0) {
+      const appResult = await sql`
+        SELECT id, proposal, bid, status, created_at FROM applications
+        WHERE project_id = ${projectId} AND freelancer_id = ${userResult.rows[0].id}
+      `;
+      if (appResult.rows.length > 0) {
+        hasApplied = true;
+        userApplication = appResult.rows[0];
+      }
+    }
+  }
+
+  // If owner, fetch applications for this project
+  let applications: any[] = [];
+  if (isOwner) {
+    const appResult = await sql`
+      SELECT a.*, u.name as freelancer_name, u.email as freelancer_email, u.image as freelancer_image
+      FROM applications a
+      JOIN users u ON a.freelancer_id = u.id
+      WHERE a.project_id = ${projectId}
+      ORDER BY a.created_at DESC
+    `;
+    applications = appResult.rows;
+  }
+
+  const status = statusConfig[project.status] || statusConfig.open;
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50/80">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <Link href="/" className="text-2xl font-bold text-gray-900">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-10">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="flex justify-between items-center h-14">
+            <Link href="/" className="text-xl font-bold text-gray-900">
               RED
             </Link>
-            <nav className="flex items-center space-x-4">
-              <Link
-                href="/projects"
-                className="text-gray-700 hover:text-blue-600"
-              >
+            <nav className="flex items-center gap-1">
+              <Link href="/projects" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 Proyectos
               </Link>
-              <Link
-                href="/dashboard"
-                className="text-gray-700 hover:text-blue-600"
-              >
+              <Link href="/dashboard" className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 Dashboard
               </Link>
             </nav>
@@ -74,112 +108,165 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
         {/* Back link */}
         <Link
           href="/projects"
-          className="text-blue-600 hover:text-blue-800 text-sm mb-4 inline-block"
+          className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-5 transition-colors"
         >
-          ← Volver a proyectos
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+          Proyectos
         </Link>
 
-        <div className="bg-white rounded-lg shadow p-6 md:p-8">
-          {/* Title & Status */}
-          <div className="flex items-start justify-between mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">{project.title}</h1>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 shrink-0 ml-4">
-              {project.status}
-            </span>
-          </div>
-
-          {/* Meta info */}
-          <div className="flex flex-wrap items-center gap-4 mb-6 pb-6 border-b border-gray-200">
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-              {project.category === 'Otro' && project.suggested_category_name
-                ? `Otro (${project.suggested_category_name})`
-                : project.category}
-            </span>
-            <CurrencyDisplay
-              amount={parseFloat(project.budget)}
-              currency={project.budget_currency || 'COP'}
-            />
-            <span className="text-sm text-gray-500">
-              Publicado {timeAgo(project.created_at)}
-            </span>
-          </div>
-
-          {/* Description */}
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Descripción</h2>
-            <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-              {project.description}
+        {/* Main card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-5 sm:p-7">
+            {/* Status + Time */}
+            <div className="flex items-center gap-3 mb-4">
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${status.bg} ${status.text}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                {status.label}
+              </span>
+              <span className="text-xs text-gray-400">
+                {timeAgo(project.created_at)}
+              </span>
             </div>
-          </div>
 
-          {/* Skills */}
-          {project.skills_required && project.skills_required.length > 0 && (
+            {/* Title */}
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight mb-4">
+              {project.title}
+            </h1>
+
+            {/* Meta row */}
+            <div className="flex flex-wrap items-center gap-3 mb-6">
+              <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                {project.category === 'Otro' && project.suggested_category_name
+                  ? `Otro (${project.suggested_category_name})`
+                  : project.category}
+              </span>
+              <CurrencyDisplay
+                amount={parseFloat(project.budget)}
+                currency={project.budget_currency || 'COP'}
+              />
+            </div>
+
+            {/* Description */}
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-3">Habilidades Requeridas</h2>
-              <div className="flex flex-wrap gap-2">
-                {project.skills_required.map((skill: string) => (
-                  <span
-                    key={skill}
-                    className="px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-full"
-                  >
-                    {skill}
-                  </span>
-                ))}
+              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Descripción</h2>
+              <div className="text-gray-700 text-[15px] whitespace-pre-wrap leading-relaxed">
+                {project.description}
               </div>
             </div>
-          )}
 
-          {/* Employer */}
-          <div className="mb-6 pb-6 border-t border-gray-200 pt-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Publicado por</h2>
-            <div className="flex items-center gap-3">
-              {project.employer_image && (
-                <img
-                  src={project.employer_image}
-                  alt={project.employer_name}
-                  className="w-10 h-10 rounded-full"
-                />
-              )}
-              <div>
-                <p className="font-medium text-gray-900">{project.employer_name}</p>
+            {/* Skills */}
+            {project.skills_required && project.skills_required.length > 0 && (
+              <div className="mb-6">
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Habilidades</h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {project.skills_required.map((skill: string) => (
+                    <span
+                      key={skill}
+                      className="px-2.5 py-1 text-xs font-medium bg-gray-50 text-gray-600 rounded-lg border border-gray-100"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Employer */}
+            <div className="pt-5 border-t border-gray-100">
+              <div className="flex items-center gap-3">
+                {project.employer_image ? (
+                  <img
+                    src={project.employer_image}
+                    alt={project.employer_name}
+                    className="w-9 h-9 rounded-full ring-2 ring-gray-100"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-sm font-medium">
+                    {project.employer_name?.charAt(0)?.toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{project.employer_name}</p>
+                  <p className="text-xs text-gray-400">Publicado por</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions (apply, edit, close, delete) */}
+            <ProjectActions
+              project={project}
+              isOwner={isOwner}
+              isAuthenticated={isAuthenticated}
+              hasApplied={hasApplied}
+              userApplication={userApplication}
+            />
+          </div>
+        </div>
+
+        {/* Applications section - only for owner */}
+        {isOwner && (
+          <div className="mt-6 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-5 sm:px-7 py-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">
+                  Aplicaciones
+                </h2>
+                <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
+                  {applications.length}
+                </span>
+              </div>
+
+              {applications.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">Aún no hay aplicaciones.</p>
+              ) : (
+                <div className="space-y-3">
+                  {applications.map((app: any) => (
+                    <div key={app.id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2.5">
+                          {app.freelancer_image ? (
+                            <img src={app.freelancer_image} alt={app.freelancer_name} className="w-8 h-8 rounded-full" />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-500">
+                              {app.freelancer_name?.charAt(0)?.toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{app.freelancer_name}</p>
+                            <p className="text-xs text-gray-400">{app.freelancer_email}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {app.bid && (
+                            <CurrencyDisplay
+                              amount={parseFloat(app.bid)}
+                              currency={project.budget_currency || 'COP'}
+                            />
+                          )}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
+                            app.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
+                            app.status === 'accepted' ? 'bg-green-50 text-green-700' :
+                            'bg-red-50 text-red-700'
+                          }`}>
+                            {app.status}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-gray-600 whitespace-pre-wrap">{app.proposal}</p>
+                      <p className="text-xs text-gray-400 mt-2">{timeAgo(app.created_at)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Apply Button */}
-          {isAuthenticated && !isOwner && project.status === 'open' && (
-            <div className="pt-4 border-t border-gray-200">
-              <Link
-                href={`/dashboard/applications?projectId=${project.id}`}
-                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
-              >
-                Aplicar a este Proyecto
-              </Link>
-            </div>
-          )}
-
-          {!isAuthenticated && project.status === 'open' && (
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-gray-600 mb-3">Inicia sesión para aplicar a este proyecto.</p>
-              <Link
-                href="/login"
-                className="inline-block px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
-              >
-                Iniciar Sesión
-              </Link>
-            </div>
-          )}
-
-          {isOwner && (
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-sm text-gray-500">Este es tu proyecto.</p>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );

@@ -75,7 +75,8 @@ async function getProjects(params: { [key: string]: string | undefined }) {
   const totalPages = Math.ceil(totalCount / limit);
 
   const result = await pool.query(
-    `SELECT p.*, u.name as employer_name
+    `SELECT p.*, u.name as employer_name,
+            (SELECT COUNT(*)::int FROM applications a WHERE a.project_id = p.id) as application_count
      FROM projects p
      JOIN users u ON p.employer_id = u.id
      ${whereClause}

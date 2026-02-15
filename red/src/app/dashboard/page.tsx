@@ -18,7 +18,8 @@ export default async function DashboardPage() {
   const [userResult, latestProjectsResult, categoriesResult] = await Promise.all([
     sql`SELECT id, subscription_tier, role FROM users WHERE email = ${session.user.email}`,
     pool.query(`
-      SELECT p.*, u.name as employer_name
+      SELECT p.*, u.name as employer_name,
+             (SELECT COUNT(*)::int FROM applications a WHERE a.project_id = p.id) as application_count
       FROM projects p
       LEFT JOIN users u ON p.employer_id = u.id
       WHERE p.status = 'open'
@@ -43,11 +44,22 @@ export default async function DashboardPage() {
   let applicationCount = 0;
 
   if (userId) {
-    const [projectsResult, appCountResult] = await Promise.all([
+    const [projectsResult, appCountResult, appCountsResult] = await Promise.all([
       sql`SELECT * FROM projects WHERE employer_id = ${userId} ORDER BY created_at DESC`,
       sql`SELECT COUNT(*)::int as count FROM applications WHERE freelancer_id = ${userId}`,
+      sql`SELECT project_id, COUNT(*)::int as cnt FROM applications GROUP BY project_id`,
     ]);
-    projects = projectsResult.rows;
+
+    // Build a map of project_id -> application count
+    const appCountMap: Record<number, number> = {};
+    for (const row of appCountsResult.rows) {
+      appCountMap[row.project_id] = Number(row.cnt) || 0;
+    }
+
+    projects = projectsResult.rows.map((p: any) => ({
+      ...p,
+      application_count: appCountMap[p.id] || 0,
+    }));
     applicationCount = appCountResult.rows[0]?.count || 0;
   }
 
@@ -158,8 +170,10 @@ export default async function DashboardPage() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{project.title}</h3>
-                      <div className="flex items-center gap-3 mt-2">
+                      <Link href={`/projects/${project.id}`} className="font-semibold text-gray-900 hover:text-blue-600 transition-colors">
+                        {project.title}
+                      </Link>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           {project.status}
                         </span>
@@ -172,6 +186,17 @@ export default async function DashboardPage() {
                           amount={parseFloat(project.budget)}
                           currency={project.budget_currency || 'COP'}
                         />
+                        {Number(project.application_count) > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700"
+                            title={`${project.application_count} aplicación${Number(project.application_count) !== 1 ? 'es' : ''}`}
+                          >
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                            {project.application_count} aplicación{Number(project.application_count) !== 1 ? 'es' : ''}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-xs text-gray-400 ml-4">
@@ -197,7 +222,15 @@ export default async function DashboardPage() {
               </Link>
             </div>
           ) : (
-            <p className="text-gray-600">Tienes {applicationCount} aplicación(es).</p>
+            <div className="flex items-center justify-between">
+              <p className="text-gray-600">Tienes {applicationCount} aplicación(es).</p>
+              <Link
+                href="/dashboard/applications"
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Ver mis aplicaciones →
+              </Link>
+            </div>
           )}
         </CollapsibleSection>
       </div>

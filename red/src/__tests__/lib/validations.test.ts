@@ -78,6 +78,17 @@ describe('applicationSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('accepts data without bid (optional)', () => {
+    const { bid, ...noBid } = validApplication;
+    const result = applicationSchema.safeParse(noBid);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts data with undefined bid', () => {
+    const result = applicationSchema.safeParse({ ...validApplication, bid: undefined });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects proposal shorter than 50 characters', () => {
     const result = applicationSchema.safeParse({ ...validApplication, proposal: 'Corta' });
     expect(result.success).toBe(false);
