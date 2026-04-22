@@ -1,36 +1,59 @@
-// src/app/(auth)/login/page.tsx
+// src/app/(auth)/register/page.tsx
 'use client';
 
-import { signIn } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
-const loginSchema = z.object({
+const registerSchema = z.object({
+  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(255),
   email: z.email('Email inválido'),
-  password: z.string().min(1, 'Ingresa tu contraseña'),
+  password: z
+    .string()
+    .min(8, 'Mínimo 8 caracteres')
+    .max(72),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Las contraseñas no coinciden',
+  path: ['confirmPassword'],
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type RegisterForm = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const [authError, setAuthError] = useState('');
+  const [serverError, setServerError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+  } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
 
-  async function onSubmit(data: LoginForm) {
+  async function onSubmit(data: RegisterForm) {
     setIsLoading(true);
-    setAuthError('');
+    setServerError('');
 
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
+      setServerError(json.error ?? 'Error al registrarse');
+      setIsLoading(false);
+      return;
+    }
+
+    // Auto-login after successful registration
     const result = await signIn('credentials', {
       email: data.email,
       password: data.password,
@@ -40,7 +63,7 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (result?.error) {
-      setAuthError('Email o contraseña incorrectos');
+      router.push('/login');
     } else {
       router.push('/dashboard');
     }
@@ -50,8 +73,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Red de Contratistas</h1>
-          <p className="mt-2 text-gray-600">Conecta con proyectos y talentos</p>
+          <h1 className="text-3xl font-bold text-gray-900">Crear cuenta</h1>
+          <p className="mt-2 text-gray-600">Red de Contratistas</p>
         </div>
 
         {/* Google OAuth */}
@@ -65,7 +88,7 @@ export default function LoginPage() {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
-          Continuar con Google
+          Registrarse con Google
         </button>
 
         <div className="relative">
@@ -73,17 +96,32 @@ export default function LoginPage() {
             <div className="w-full border-t border-gray-300" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-gray-50 text-gray-500">o ingresa con email</span>
+            <span className="px-2 bg-gray-50 text-gray-500">o crea una cuenta con email</span>
           </div>
         </div>
 
-        {/* Email / Password form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {authError && (
+          {serverError && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-              {authError}
+              {serverError}
             </p>
           )}
+
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              Nombre completo
+            </label>
+            <input
+              id="name"
+              type="text"
+              autoComplete="name"
+              {...register('name')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+            {errors.name && (
+              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
+            )}
+          </div>
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -108,7 +146,7 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete="new-password"
               {...register('password')}
               className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
             />
@@ -117,19 +155,35 @@ export default function LoginPage() {
             )}
           </div>
 
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              Confirmar contraseña
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              {...register('confirmPassword')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
+            />
+            {errors.confirmPassword && (
+              <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
+            )}
+          </div>
+
           <button
             type="submit"
             disabled={isLoading}
             className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Ingresando...' : 'Ingresar'}
+            {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
 
         <p className="text-center text-sm text-gray-600">
-          ¿No tienes cuenta?{' '}
-          <Link href="/register" className="text-blue-600 hover:underline font-medium">
-            Regístrate
+          ¿Ya tienes cuenta?{' '}
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">
+            Ingresar
           </Link>
         </p>
       </div>

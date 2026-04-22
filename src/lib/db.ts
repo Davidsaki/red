@@ -85,6 +85,11 @@ export async function initDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'
     `);
 
+    // Add password_hash for email/password auth (NULL for OAuth-only users)
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
+    `);
+
     // Add budget_currency column to projects
     await pool.query(`
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS budget_currency VARCHAR(3) DEFAULT 'COP'
@@ -246,21 +251,28 @@ export async function seedCategories(): Promise<void> {
     }
   }
 
-  // Promote admins: ADMIN_EMAIL env var + hardcoded list
-  const adminEmails: string[] = [
-    'CruzR.Daniel@gmail.com',
-    'miguelcruz.conde@gmail.com',
-  ];
-  if (process.env.ADMIN_EMAIL) {
-    adminEmails.push(process.env.ADMIN_EMAIL);
+  // Promote admins from ADMIN_EMAILS env var (comma-separated)
+  // Example: ADMIN_EMAILS=user1@gmail.com,user2@gmail.com
+  const adminEmails: string[] = [];
+  if (process.env.ADMIN_EMAILS) {
+    adminEmails.push(
+      ...process.env.ADMIN_EMAILS.split(',').map((e) => e.trim()).filter(Boolean)
+    );
   }
+  // Legacy single-email support
+  if (process.env.ADMIN_EMAIL) {
+    adminEmails.push(process.env.ADMIN_EMAIL.trim());
+  }
+
   for (const email of adminEmails) {
     await pool.query(
       "UPDATE users SET role = 'admin' WHERE LOWER(email) = LOWER($1)",
       [email]
     );
   }
-  console.log(`Admin roles set for: ${adminEmails.join(', ')}`);
+  if (adminEmails.length > 0) {
+    console.log(`Admin roles set for: ${adminEmails.join(', ')}`);
+  }
 
   console.log('Categorías y habilidades sembradas correctamente');
 }

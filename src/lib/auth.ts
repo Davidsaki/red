@@ -1,6 +1,8 @@
 ﻿// src/lib/auth.ts
 import { NextAuthOptions, getServerSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { sql } from "./db";
 
 export const authOptions: NextAuthOptions = {
@@ -9,12 +11,46 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Contraseña', type: 'password' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+
+        const result = await sql<{ id: number; email: string; name: string; image: string | null; password_hash: string | null }>`
+          SELECT id, email, name, image, password_hash FROM users WHERE email = ${credentials.email}
+        `;
+
+        if (result.rows.length === 0) return null;
+
+        const user = result.rows[0];
+        if (!user.password_hash) return null; // Google-only account
+
+        const isValid = await bcrypt.compare(credentials.password, user.password_hash);
+        if (!isValid) return null;
+
+        return {
+          id: user.id.toString(),
+          email: user.email,
+          name: user.name,
+          image: user.image,
+        };
+      },
+    }),
   ],
   pages: {
     signIn: '/login',
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
+      // Credentials provider: user already exists (created via /api/auth/register)
+      if (account?.provider === 'credentials') {
+        return true;
+      }
+
       try {
         if (!user.email) {
           console.error('No email provided by OAuth provider');

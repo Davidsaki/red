@@ -265,22 +265,29 @@ export async function POST(request: NextRequest) {
 ## Authentication
 
 ### Current Setup
-- **NextAuth v4** with Google OAuth provider
-- Session-based authentication
-- Protected routes should use middleware or `auth()` helper
+- **NextAuth v4** with two providers:
+  - **Google OAuth** — login social
+  - **Credentials (Email + Password)** — `bcryptjs` con salt rounds=12
+- Session JWT-based (stateless, no DB calls in middleware)
+- Protected routes guarded by `src/proxy.ts` (Next.js 16 proxy file)
+
+### Auth Providers — Rules
+- **DO NOT add GitHub OAuth** — out of scope for this platform
+- Google OAuth and Email+Password are the only supported providers
+- Magic links (passwordless email) can be added in the future via Resend
+- Never store plain-text passwords — always use `bcrypt.hash(password, 12)`
+- Google-only users have `password_hash = NULL` in DB — they cannot use credentials login
+- New email/password users are created via `POST /api/auth/register` (not directly in NextAuth)
 
 ### Usage in Server Components
 ```typescript
-import { auth } from '@/lib/auth';
+import { getSession } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 
 export default async function DashboardPage() {
-  const session = await auth();
-
-  if (!session) {
-    redirect('/login');
-  }
-
-  // Use session.user
+  const session = await getSession();
+  if (!session) redirect('/login');
+  // session.user.id, session.user.role, session.user.subscription
 }
 ```
 
@@ -289,14 +296,26 @@ export default async function DashboardPage() {
 'use client';
 import { signIn, signOut } from 'next-auth/react';
 
-// Login
+// Google login
 <button onClick={() => signIn('google', { callbackUrl: '/dashboard' })}>
-  Sign in with Google
+  Continuar con Google
 </button>
 
+// Email/password login
+const result = await signIn('credentials', { email, password, redirect: false });
+
 // Logout
-<button onClick={() => signOut()}>Sign out</button>
+<button onClick={() => signOut()}>Salir</button>
 ```
+
+### Admin Management
+- **NEVER hardcode admin emails in source code**
+- Admins are designated exclusively via environment variables:
+  - `ADMIN_EMAILS=email1@gmail.com,email2@gmail.com` (comma-separated, preferred)
+  - `ADMIN_EMAIL=email@gmail.com` (legacy single-email, still supported)
+- Roles are assigned when `/api/init-db` is called (runs `seedCategories()`)
+- To promote a new admin: add their email to `ADMIN_EMAILS` env var and call `/api/init-db` again
+- Admin role check: `session.user.role === 'admin'`
 
 ## Subscription Tiers
 
@@ -312,13 +331,74 @@ import { signIn, signOut } from 'next-auth/react';
 - Priority support
 - Featured listings
 
+## Security Standards (Non-Negotiable Rules)
+
+These rules apply to ALL new features and routes. They are mandatory, not optional.
+
+### Route Protection
+- All `/dashboard/*` routes are protected by `src/proxy.ts` (Next.js 16 proxy/middleware)
+- Any new protected route group must be added to the `matcher` in `src/proxy.ts`
+- Server Components and API routes must independently verify session — the proxy is defense-in-depth, not the only guard
+
+### API Route Authorization Template
+Every API route that modifies data or reads sensitive data MUST follow this pattern:
+```typescript
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  // For admin-only routes:
+  if (session.user.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+  // ...
+}
+```
+
+### Endpoint Security Rules
+- **NEVER** create public endpoints that expose user lists, env vars, or DB schema
+- `/api/debug` — development-only (`NODE_ENV !== 'development'` returns 404)
+- `/api/init-db` — requires admin session OR `x-init-secret` header in production
+- `/api/users` — admin-only
+- Any new admin endpoint MUST check `session.user.role === 'admin'`
+- Use 404 (not 403) to hide existence of sensitive endpoints from unauthenticated users
+
+### Input Validation
+- Validate ALL API request bodies with Zod before processing
+- Use `schema.safeParse()` (not `schema.parse()`) and return 400 on failure
+- Reference Zod v4 API: use `validation.error.issues[0].message` (not `.errors`)
+- Never trust `session.user.id` from client — always resolve from server session
+
+### Database Security
+- Always use parameterized queries via `sql\`...\`` template literals or `pool.query(query, params[])`
+- Never concatenate user input into SQL strings
+- Never log full connection strings or credentials
+- passwords stored as `bcrypt` hash with salt rounds=12 in `users.password_hash`
+
+### HTTP Security Headers
+Headers are configured in `next.config.ts` and applied to all routes:
+- `X-Frame-Options: SAMEORIGIN` — prevents clickjacking
+- `X-Content-Type-Options: nosniff` — prevents MIME sniffing
+- `Strict-Transport-Security` — enforces HTTPS
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy` — disables camera/microphone/geolocation
+
+### Environment Variables
+- Never commit `.env.local` to git (in `.gitignore`)
+- Production secrets only in Vercel Dashboard env vars
+- Validate all user inputs with Zod
+- Use CSRF protection (NextAuth handles this automatically)
+
 ## Important Notes
 
-### Security
+### Security (legacy notes — see Security Standards above)
 - Never commit `.env.local` to git
 - Validate all user inputs with Zod
 - Sanitize database queries (use parameterized queries with `sql` template literals)
-- Implement rate limiting for API routes (future)
 - Use CSRF protection (NextAuth handles this)
 
 ### Performance
@@ -361,10 +441,7 @@ await initDatabase(); // Creates all tables if they don't exist
 
 ## Known Issues
 
-1. **Login not working** - Auth providers array is empty in `src/lib/auth.ts`
-   - Need to add Google provider configuration
-2. **No middleware** - Protected routes are not automatically guarded
-3. **No API routes implemented** - Folder structure exists but routes are empty
+_(none currently)_
 
 ## Future Enhancements
 
