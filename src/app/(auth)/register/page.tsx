@@ -4,18 +4,15 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { signIn } from 'next-auth/react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(255),
   email: z.email('Email inválido'),
-  password: z
-    .string()
-    .min(8, 'Mínimo 8 caracteres')
-    .max(72),
+  password: z.string().min(8, 'Mínimo 8 caracteres').max(72),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden',
@@ -24,16 +21,17 @@ const registerSchema = z.object({
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
+const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
+
 export default function RegisterPage() {
-  const router = useRouter();
   const [serverError, setServerError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [registered, setRegistered] = useState(false);
+  const cfTokenRef = useRef('');
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<RegisterForm>({ resolver: zodResolver(registerSchema) });
+  const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
+    resolver: zodResolver(registerSchema),
+  });
 
   async function onSubmit(data: RegisterForm) {
     setIsLoading(true);
@@ -42,42 +40,54 @@ export default function RegisterPage() {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: data.name, email: data.email, password: data.password }),
+      body: JSON.stringify({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        cfToken: cfTokenRef.current,
+      }),
     });
 
     const json = await res.json();
+    setIsLoading(false);
 
     if (!res.ok) {
       setServerError(json.error ?? 'Error al registrarse');
-      setIsLoading(false);
       return;
     }
 
-    // Auto-login after successful registration
-    const result = await signIn('credentials', {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    setRegistered(true);
+  }
 
-    setIsLoading(false);
-
-    if (result?.error) {
-      router.push('/login');
-    } else {
-      router.push('/dashboard');
-    }
+  if (registered) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full text-center p-8 space-y-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900">Revisa tu email</h2>
+          <p className="text-gray-600">
+            Te enviamos un enlace de confirmación. Haz clic en él para activar tu cuenta.
+          </p>
+          <Link href="/login" className="inline-block mt-2 text-blue-600 hover:underline text-sm">
+            Volver al login
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
+      <div className="max-w-md w-full space-y-6 p-8">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-gray-900">Crear cuenta</h1>
           <p className="mt-2 text-gray-600">Red de Contratistas</p>
         </div>
 
-        {/* Google OAuth */}
         <button
           onClick={() => signIn('google', { callbackUrl: '/dashboard' })}
           className="w-full flex items-center justify-center gap-3 py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -106,75 +116,37 @@ export default function RegisterPage() {
               {serverError}
             </p>
           )}
-
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Nombre completo
-            </label>
-            <input
-              id="name"
-              type="text"
-              autoComplete="name"
-              {...register('name')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            />
-            {errors.name && (
-              <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>
-            )}
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nombre completo</label>
+            <input id="name" type="text" autoComplete="name" {...register('name')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none" />
+            {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
           </div>
-
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              {...register('email')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            />
-            {errors.email && (
-              <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>
-            )}
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+            <input id="email" type="email" autoComplete="email" {...register('email')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none" />
+            {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
           </div>
-
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              {...register('password')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            />
-            {errors.password && (
-              <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>
-            )}
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">Contraseña</label>
+            <input id="password" type="password" autoComplete="new-password" {...register('password')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none" />
+            {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
           </div>
-
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-              Confirmar contraseña
-            </label>
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              {...register('confirmPassword')}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 focus:outline-none"
-            />
-            {errors.confirmPassword && (
-              <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
-            )}
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirmar contraseña</label>
+            <input id="confirmPassword" type="password" autoComplete="new-password" {...register('confirmPassword')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none" />
+            {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>}
           </div>
-
+          {SITE_KEY && (
+            <Turnstile siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
+          )}
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex justify-center py-3 px-4 rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
@@ -182,9 +154,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-gray-600">
           ¿Ya tienes cuenta?{' '}
-          <Link href="/login" className="text-blue-600 hover:underline font-medium">
-            Ingresar
-          </Link>
+          <Link href="/login" className="text-blue-600 hover:underline font-medium">Ingresar</Link>
         </p>
       </div>
     </div>

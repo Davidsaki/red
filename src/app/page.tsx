@@ -1,7 +1,12 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import Header from '@/components/Header';
+import { getSession } from '@/lib/auth';
 
-export default function Home() {
+export default async function Home() {
+  const session = await getSession();
+  if (session) redirect('/dashboard');
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       <Header />
@@ -18,7 +23,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/login"
+              href="/register"
               className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 font-medium text-lg"
             >
               Comenzar Gratis

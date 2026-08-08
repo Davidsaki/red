@@ -90,6 +90,34 @@ export async function initDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)
     `);
 
+    // email_verified: false for credentials users until they confirm, true for OAuth
+    await pool.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT false
+    `);
+
+    // Tokens for email verification (one per user, replaced on resend)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Tokens for magic link login (one-time use, 15 min expiry)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS magic_link_tokens (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        token VARCHAR(255) UNIQUE NOT NULL,
+        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        used_at TIMESTAMP WITH TIME ZONE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Add budget_currency column to projects
     await pool.query(`
       ALTER TABLE projects ADD COLUMN IF NOT EXISTS budget_currency VARCHAR(3) DEFAULT 'COP'

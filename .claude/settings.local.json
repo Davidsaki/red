@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(tree:*)",
-      "Bash(npm run build:*)",
-      "Bash(node check-db.mjs:*)"
-    ]
-  }
-}

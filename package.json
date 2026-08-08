@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
+    "@marsidev/react-turnstile": "^1.5.5",
     "@types/bcryptjs": "^2.4.6",
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
@@ -24,6 +25,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.67.0",
+    "resend": "^6.18.1",
     "zod": "^4.1.13"
   },
   "devDependencies": {
