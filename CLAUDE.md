@@ -19,6 +19,7 @@ RED is a freelance marketplace platform where users can post projects/jobs and o
 
 ### Backend & Database
 - **Vercel Postgres** (`@vercel/postgres`) - PostgreSQL database
+- **node-pg-migrate** - Versioned schema migrations (see `/migrations`)
 - **NextAuth v4** (`next-auth@4.24.13`) - Authentication with Google OAuth
 - **Vercel** - Hosting and serverless functions
 
@@ -54,15 +55,22 @@ red/
 │   │   └── globals.css          # Global styles
 │   ├── lib/
 │   │   ├── auth.ts             # NextAuth configuration
-│   │   └── db.ts               # Database initialization & queries
+│   │   ├── db.ts               # DB connection pool & query helpers (no schema — see /migrations)
+│   │   ├── email.ts            # Resend client, sendVerificationEmail, sendMagicLink
+│   │   └── tokens.ts           # Token generation + validateTurnstile
 │   └── types/
 │       └── next-auth.d.ts      # NextAuth type extensions
+├── migrations/                   # node-pg-migrate — source of truth for DB schema
+├── scripts/
+│   └── db-query.mjs             # Ad-hoc SQL from the terminal: npm run db:query "SELECT ..."
 ├── public/                      # Static assets
 ├── .env.local                   # Environment variables (NOT in git)
 └── package.json
 ```
 
 ## Database Schema
+
+**Source of truth is `/migrations`** (node-pg-migrate), not this doc — the tables below are a quick-reference snapshot and can drift. Before writing code against the schema, check the migrations folder if precision matters.
 
 ### Users Table
 ```sql
@@ -273,8 +281,8 @@ export async function POST(request: NextRequest) {
 
 ### Auth Providers — Rules
 - **DO NOT add GitHub OAuth** — out of scope for this platform
-- Google OAuth and Email+Password are the only supported providers
-- Magic links (passwordless email) can be added in the future via Resend
+- Supported providers: Google OAuth, Email+Password, and Magic Links (passwordless, via Resend)
+- Email/password users get a verification email on signup (`email_verified` starts `false`); Google/magic-link users are verified automatically
 - Never store plain-text passwords — always use `bcrypt.hash(password, 12)`
 - Google-only users have `password_hash = NULL` in DB — they cannot use credentials login
 - New email/password users are created via `POST /api/auth/register` (not directly in NextAuth)
@@ -417,11 +425,10 @@ Headers are configured in `next.config.ts` and applied to all routes:
 
 ## Common Tasks
 
-### Initialize Database
-```typescript
-import { initDatabase } from '@/lib/db';
-await initDatabase(); // Creates all tables if they don't exist
-```
+### Set Up a Fresh Database (new dev DB, or first-time setup)
+1. Point `POSTGRES_URL`/`DATABASE_URL` in `.env.local` at the target (empty) database.
+2. Run `npm run migrate:up` — applies every migration in `/migrations` in order.
+3. Start the app and call `GET /api/init-db` as an admin (or with `x-init-secret`) to seed categories/skills and promote admins from `ADMIN_EMAILS`.
 
 ### Create a New API Route
 1. Create file in `src/app/api/[route-name]/route.ts`
@@ -435,13 +442,44 @@ await initDatabase(); // Creates all tables if they don't exist
 3. Export default function component
 4. For protected routes, check auth in the component
 
-### Add Database Migration
-- Manually run SQL commands in Vercel Postgres dashboard, or
-- Add migration logic to `initDatabase()` function in `lib/db.ts`
+### Add a Database Migration
+**Never** hand-edit the schema in the DB console or add ad-hoc `ALTER TABLE` calls in app code — all schema changes go through a migration:
+1. `npm run migrate:create descriptive-name` — creates a timestamped file in `/migrations`.
+2. Edit the generated file's `up`/`down` using the `pgm` API (see existing migrations for patterns like `pgm.createTable`, `pgm.addColumn`).
+3. `npm run migrate:up` to apply it locally and confirm it works.
+4. Commit the migration file. Run `npm run migrate:up` again against production after deploying (there's no auto-run-on-deploy step yet — see Future Enhancements).
+5. To undo the last migration locally: `npm run migrate:down`.
+
+## Lessons Learned & Best Practices
+
+Living log of project-specific gotchas and decisions. Read the relevant subsection before touching that area; add a short entry whenever something non-obvious bites us. Keep entries brief: what happened, why, what to do instead.
+
+### Database
+- Schema lives entirely in `/migrations` (node-pg-migrate). `src/lib/db.ts` no longer has an `initDatabase()` — it was retired in favor of migrations (Aug 2026). Never add ad-hoc `CREATE TABLE`/`ALTER TABLE` in app code again; see "Add a Database Migration" above.
+- There is currently only **one** database (Prisma Postgres) — `.env.local` and Vercel Production point at the same instance, there's no dev/QA DB yet. Treat `npm run db:query` `DELETE`/`UPDATE` as touching real data. Worth revisiting before the MVP goes live to real users.
+- `pool.query()` (raw `pg`) is required for dynamic queries (variable `WHERE` clauses etc.) — the `sql` tagged-template helper in `db.ts` only supports static query shapes.
+
+### Auth / Forms
+- Cloudflare Turnstile tokens are single-use. Any Turnstile-protected form must call `turnstileRef.current?.reset()` after every submit attempt (success or failure), or a retried submission reuses a stale token and fails with a generic "Verificación fallida" error that masks the real problem (e.g. a duplicate-email error on the first try). See `login/page.tsx` / `register/page.tsx` for the pattern to copy.
+- Zod `.default()` breaks type inference with react-hook-form's `zodResolver`. Use `.optional()` instead when the field already has a default set elsewhere (defaultValues, hidden input, DB default).
+- Zod v4: read errors as `validation.error.issues[0].message`, not `.errors` (that was v3).
+- `useSearchParams()` must be wrapped in `<Suspense>` or the production build fails with a prerender error.
+
+### Next.js 16
+- `middleware.ts` was renamed to `src/proxy.ts` — route protection lives there.
+- `params` and `searchParams` in page/route props are `Promise<>` — always `await` them.
+
+### Secrets & Credentials
+- Never print a raw connection string, API key, or secret in a terminal command whose output lands in a chat transcript — even a quick `sed`/`grep` "mask" is risky if the pattern doesn't match exactly. If a secret leaks into a transcript, treat it as compromised and rotate it immediately.
+- DB/Resend/Turnstile credentials go in Vercel env vars (production) and `.env.local` (local) — never in code or in this file.
+- `.claude/settings.local.json` is local Claude Code config, not project config — it's gitignored; don't re-add it to the repo.
+
+### Environment
+- Windows PowerShell can block `npm` with an execution-policy error (`npm.ps1` disabled). Fix: use `npm.cmd` instead of `npm`, or run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
 
 ## Known Issues
 
-_(none currently)_
+- No separate dev/QA database — local and production share the same Postgres instance (see Lessons Learned → Database).
 
 ## Future Enhancements
 

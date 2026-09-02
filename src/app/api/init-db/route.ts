@@ -1,7 +1,9 @@
 // src/app/api/init-db/route.ts
 // Admin-only endpoint. Requires INIT_DB_SECRET header to prevent unauthorized calls.
+// Schema is managed by migrations (see /migrations, run via `npm run migrate:up`) —
+// this route only seeds categories/skills and promotes admins from ADMIN_EMAILS.
 import { NextRequest, NextResponse } from 'next/server';
-import { initDatabase, seedCategories } from '@/lib/db';
+import { seedCategories } from '@/lib/db';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -20,14 +22,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    await initDatabase();
     await seedCategories();
     return NextResponse.json({
       success: true,
-      message: 'Database initialized and categories seeded successfully',
+      message: 'Categories seeded and admins promoted successfully',
     });
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('Seeding error:', error);
     return NextResponse.json(
       {
         success: false,

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { useState, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Turnstile } from '@marsidev/react-turnstile';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 
 const loginSchema = z.object({
   email: z.email('Email inválido'),
@@ -42,6 +42,7 @@ function LoginContent() {
   const [magicSent, setMagicSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const cfTokenRef = useRef('');
+  const turnstileRef = useRef<TurnstileInstance>(undefined);
 
   const passwordForm = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
   const magicForm = useForm<MagicForm>({ resolver: zodResolver(magicSchema) });
@@ -58,6 +59,7 @@ function LoginContent() {
     });
 
     setIsLoading(false);
+    turnstileRef.current?.reset();
 
     if (result?.error) {
       if (result.error.includes('verify') || result.error === 'CredentialsSignin') {
@@ -82,6 +84,7 @@ function LoginContent() {
 
     setIsLoading(false);
     setMagicSent(true);
+    turnstileRef.current?.reset();
   }
 
   return (
@@ -178,7 +181,7 @@ function LoginContent() {
               )}
             </div>
             {SITE_KEY && (
-              <Turnstile siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
+              <Turnstile ref={turnstileRef} siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
             )}
             <button
               type="submit"
@@ -210,7 +213,7 @@ function LoginContent() {
               )}
             </div>
             {SITE_KEY && (
-              <Turnstile siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
+              <Turnstile ref={turnstileRef} siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
             )}
             <button
               type="submit"

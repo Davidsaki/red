@@ -9,7 +9,12 @@
     "lint": "eslint",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "db:query": "node --env-file=.env.local scripts/db-query.mjs",
+    "migrate": "node --env-file=.env.local node_modules/node-pg-migrate/bin/node-pg-migrate.js",
+    "migrate:up": "npm run migrate -- up",
+    "migrate:down": "npm run migrate -- down",
+    "migrate:create": "npm run migrate -- create"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -43,6 +48,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.5",
     "jsdom": "^28.0.0",
+    "node-pg-migrate": "^9.0.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.0.18"

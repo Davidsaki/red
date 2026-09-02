@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
-import { Turnstile } from '@marsidev/react-turnstile';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(255),
@@ -28,6 +28,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
   const cfTokenRef = useRef('');
+  const turnstileRef = useRef<TurnstileInstance>(undefined);
 
   const { register, handleSubmit, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -50,6 +51,7 @@ export default function RegisterPage() {
 
     const json = await res.json();
     setIsLoading(false);
+    turnstileRef.current?.reset();
 
     if (!res.ok) {
       setServerError(json.error ?? 'Error al registrarse');
@@ -141,7 +143,7 @@ export default function RegisterPage() {
             {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>}
           </div>
           {SITE_KEY && (
-            <Turnstile siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
+            <Turnstile ref={turnstileRef} siteKey={SITE_KEY} onSuccess={(token) => { cfTokenRef.current = token; }} />
           )}
           <button
             type="submit"
