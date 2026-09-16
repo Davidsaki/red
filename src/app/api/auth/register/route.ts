@@ -30,8 +30,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const { name, email, password, cfToken } = validation.data;
 
-    // Validate Turnstile in production
-    if (cfToken) {
+    // Validate Turnstile in production. A missing token must be rejected, not skipped,
+    // otherwise bots bypass verification simply by omitting the field.
+    if (process.env.NODE_ENV === 'production') {
+      if (!cfToken) {
+        return NextResponse.json({ error: 'Verificación de seguridad requerida' }, { status: 400 });
+      }
       const valid = await validateTurnstile(cfToken);
       if (!valid) {
         return NextResponse.json({ error: 'Verificación fallida. Intenta de nuevo.' }, { status: 400 });

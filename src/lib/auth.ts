@@ -22,8 +22,10 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // Validate Turnstile in production
-        if (process.env.NODE_ENV === 'production' && credentials.cfToken) {
+        // Validate Turnstile in production. A missing token must be rejected, not skipped,
+        // otherwise bots bypass verification simply by omitting the field.
+        if (process.env.NODE_ENV === 'production') {
+          if (!credentials.cfToken) return null;
           const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
