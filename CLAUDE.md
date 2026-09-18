@@ -163,6 +163,11 @@ NEXTAUTH_SECRET=your_generated_secret  # Same secret as local
 POSTGRES_URL=
 POSTGRES_PRISMA_URL=
 POSTGRES_URL_NON_POOLING=
+
+# Rate limiting (Upstash Redis — sign up free at upstash.com directly,
+# NOT via Vercel's marketplace integration, which is paid-only)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
 **Note:** Never commit `.env.local` to git (already in `.gitignore`)
@@ -380,6 +385,19 @@ export async function POST(request: NextRequest) {
 - Use `schema.safeParse()` (not `schema.parse()`) and return 400 on failure
 - Reference Zod v4 API: use `validation.error.issues[0].message` (not `.errors`)
 - Never trust `session.user.id` from client — always resolve from server session
+- Every free-text string field (description, proposal, comment, etc.) MUST have a `.max()` bound — an unbounded field is a storage/DoS vector
+
+### Anti-Bot & Rate Limiting
+- Any anti-bot token (Turnstile `cfToken`, etc.) MUST be **required**, never conditionally checked. **NEVER** write `if (cfToken) { validate(...) }` — if the field is omitted, that check is skipped entirely, which is exactly how a bot bypasses it. Always:
+  ```typescript
+  if (process.env.NODE_ENV === 'production') {
+    if (!cfToken) return NextResponse.json({ error: '...' }, { status: 400 }); // or `return null` in a NextAuth authorize()
+    const valid = await validateTurnstile(cfToken);
+    if (!valid) return NextResponse.json({ error: '...' }, { status: 400 });
+  }
+  ```
+- Every new public, unauthenticated endpoint that does real work on POST (registration, login, magic-link/password-reset requests, contact forms, etc.) MUST call `isRateLimited()` from `src/lib/rate-limit.ts` before doing that work — key by client IP (`getClientIp(request)`) and/or by the target identifier (e.g. email) as appropriate. See `src/app/api/auth/register/route.ts` and `magic-link/route.ts` for the pattern. Turnstile and rate limiting are two independent layers — neither replaces the other.
+- Single-use tokens (email verification, magic links, password resets) must be consumed with **one atomic** `UPDATE ... WHERE used_at IS NULL RETURNING ...` — never a separate `SELECT` to check `used_at` followed by an `UPDATE`, which leaves a check-then-act race window.
 
 ### Database Security
 - Always use parameterized queries via `sql\`...\`` template literals or `pool.query(query, params[])`
@@ -456,10 +474,11 @@ Living log of project-specific gotchas and decisions. Read the relevant subsecti
 
 ### Database
 - Schema lives entirely in `/migrations` (node-pg-migrate). `src/lib/db.ts` no longer has an `initDatabase()` — it was retired in favor of migrations (Aug 2026). Never add ad-hoc `CREATE TABLE`/`ALTER TABLE` in app code again; see "Add a Database Migration" above.
-- There is currently only **one** database (Prisma Postgres) — `.env.local` and Vercel Production point at the same instance, there's no dev/QA DB yet. Treat `npm run db:query` `DELETE`/`UPDATE` as touching real data. Worth revisiting before the MVP goes live to real users.
+- There are two separate Prisma Postgres databases: `red-db-dev` (local dev, not linked to the Vercel project) and `red-db` (production, linked). `.env.local` should point at `red-db-dev`. Before running `npm run db:query` with `DELETE`/`UPDATE`, check which connection string is actually in `.env.local` right now — it's easy to leave it pointed at prod after debugging a production issue and forget to switch back.
 - `pool.query()` (raw `pg`) is required for dynamic queries (variable `WHERE` clauses etc.) — the `sql` tagged-template helper in `db.ts` only supports static query shapes.
 
 ### Auth / Forms
+- **(Sept 2026 incident)** `register`, `login`, and `magic-link` all shipped with `cfToken` optional and only validated `if (cfToken)` — a bot hit `/api/auth/register` directly with the field omitted, skipped Turnstile entirely, and created 140+ fake accounts over several days, each triggering a real verification email to a scraped address. Fixed by requiring the token in production (see "Anti-Bot & Rate Limiting" above) and adding rate limiting. **Lesson:** an optional field can never be allowed to gate a security check — check the rule above before writing any new Turnstile/anti-bot integration.
 - Cloudflare Turnstile tokens are single-use. Any Turnstile-protected form must call `turnstileRef.current?.reset()` after every submit attempt (success or failure), or a retried submission reuses a stale token and fails with a generic "Verificación fallida" error that masks the real problem (e.g. a duplicate-email error on the first try). See `login/page.tsx` / `register/page.tsx` for the pattern to copy.
 - Zod `.default()` breaks type inference with react-hook-form's `zodResolver`. Use `.optional()` instead when the field already has a default set elsewhere (defaultValues, hidden input, DB default).
 - Zod v4: read errors as `validation.error.issues[0].message`, not `.errors` (that was v3).
@@ -479,7 +498,7 @@ Living log of project-specific gotchas and decisions. Read the relevant subsecti
 
 ## Known Issues
 
-- No separate dev/QA database — local and production share the same Postgres instance (see Lessons Learned → Database).
+_(none currently)_
 
 ## Future Enhancements
 
@@ -489,7 +508,7 @@ Living log of project-specific gotchas and decisions. Read the relevant subsecti
 - [ ] Implement search functionality (PostgreSQL full-text search)
 - [ ] Add file upload for user avatars and project images
 - [ ] Payment integration (Stripe) for premium subscriptions
-- [ ] Rate limiting for API routes
+- [x] Rate limiting for API routes (Upstash Redis + `@upstash/ratelimit`, see `src/lib/rate-limit.ts` — covers register/login/magic-link; not yet on every route)
 - [ ] Analytics dashboard
 - [ ] Admin panel
 - [ ] Real-time notifications (WebSockets or Server-Sent Events)
