@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { sql } from '@/lib/db';
 import { createVerificationToken, validateTurnstile } from '@/lib/tokens';
 import { sendVerificationEmail } from '@/lib/email';
+import { getClientIp, isRateLimited } from '@/lib/rate-limit';
 
 const registerSchema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(255),
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const { name, email, password, cfToken } = validation.data;
+
+    if (await isRateLimited(`register:ip:${getClientIp(request)}`, `register:email:${email}`)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, { status: 429 });
+    }
 
     // Validate Turnstile in production. A missing token must be rejected, not skipped,
     // otherwise bots bypass verification simply by omitting the field.

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { pool, sql } from '@/lib/db';
 import { createMagicLinkToken, validateTurnstile } from '@/lib/tokens';
 import { sendMagicLink } from '@/lib/email';
+import { getClientIp, isRateLimited } from '@/lib/rate-limit';
 
 const requestSchema = z.object({
   email: z.email('Email inválido'),
@@ -21,6 +22,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const { email, cfToken } = validation.data;
+
+    if (await isRateLimited(`magic-link:ip:${getClientIp(request)}`, `magic-link:email:${email}`)) {
+      return NextResponse.json({ error: 'Demasiados intentos. Intenta de nuevo más tarde.' }, { status: 429 });
+    }
 
     // A missing token must be rejected, not skipped, otherwise bots bypass verification
     // simply by omitting the field.

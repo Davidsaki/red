@@ -4,6 +4,7 @@ import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { sql, pool } from "./db";
+import { isRateLimited } from "./rate-limit";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -21,6 +22,10 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        // Per-account limit, independent of Turnstile — slows down credential
+        // stuffing/brute force against a single email even if a bot solves the captcha.
+        if (await isRateLimited(`login:email:${credentials.email}`)) return null;
 
         // Validate Turnstile in production. A missing token must be rejected, not skipped,
         // otherwise bots bypass verification simply by omitting the field.
