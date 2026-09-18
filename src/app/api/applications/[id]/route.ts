@@ -6,7 +6,7 @@ import { sql } from '@/lib/db';
 import { z } from 'zod';
 
 const updateSchema = z.object({
-  proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres'),
+  proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres').max(5000, 'La propuesta es demasiado larga'),
   bid: z.number().positive('La oferta debe ser un número positivo').optional(),
 });
 

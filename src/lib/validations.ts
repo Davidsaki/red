@@ -4,7 +4,7 @@ import { z } from 'zod';
 // Project creation schema
 export const projectSchema = z.object({
   title: z.string().min(5, 'El título debe tener al menos 5 caracteres').max(255, 'El título es demasiado largo'),
-  description: z.string().min(20, 'La descripción debe tener al menos 20 caracteres'),
+  description: z.string().min(20, 'La descripción debe tener al menos 20 caracteres').max(5000, 'La descripción es demasiado larga'),
   category: z.string().min(1, 'La categoría es requerida'),
   budget: z.number().positive('El presupuesto debe ser un número positivo').max(50000000000, 'El presupuesto es demasiado alto'),
   budget_currency: z.enum(['COP', 'USD']).optional(),
@@ -16,7 +16,7 @@ export type ProjectFormData = z.infer<typeof projectSchema>;
 // Application creation schema
 export const applicationSchema = z.object({
   project_id: z.number().positive(),
-  proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres'),
+  proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres').max(5000, 'La propuesta es demasiado larga'),
   bid: z.number().positive('La oferta debe ser un número positivo').optional(),
 });
 

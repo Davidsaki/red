@@ -63,31 +63,29 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.magicToken) return null;
 
-        const result = await pool.query<{ id: number; email: string; name: string; image: string | null; used_at: Date | null; expires_at: Date }>(
-          `SELECT u.id, u.email, u.name, u.image, m.used_at, m.expires_at
-           FROM magic_link_tokens m
-           JOIN users u ON u.email = m.email
-           WHERE m.token = $1`,
+        // Atomically claim the token: only one concurrent request can win this
+        // UPDATE, closing the check-then-act race between reading used_at and
+        // setting it.
+        const claim = await pool.query<{ email: string }>(
+          `UPDATE magic_link_tokens SET used_at = NOW()
+           WHERE token = $1 AND used_at IS NULL AND expires_at > NOW()
+           RETURNING email`,
           [credentials.magicToken]
         );
 
-        if (result.rows.length === 0) return null;
+        if (claim.rows.length === 0) return null;
 
-        const row = result.rows[0];
-        if (row.used_at) return null;
-        if (new Date() > new Date(row.expires_at)) return null;
-
-        // Mark token as used and mark user email as verified
-        await pool.query(
-          `UPDATE magic_link_tokens SET used_at = NOW() WHERE token = $1`,
-          [credentials.magicToken]
-        );
-        await pool.query(
-          `UPDATE users SET email_verified = true WHERE id = $1`,
-          [row.id]
+        const { email } = claim.rows[0];
+        const userResult = await pool.query<{ id: number; email: string; name: string; image: string | null }>(
+          `UPDATE users SET email_verified = true WHERE email = $1
+           RETURNING id, email, name, image`,
+          [email]
         );
 
-        return { id: row.id.toString(), email: row.email, name: row.name, image: row.image };
+        if (userResult.rows.length === 0) return null;
+
+        const user = userResult.rows[0];
+        return { id: user.id.toString(), email: user.email, name: user.name, image: user.image };
       },
     }),
   ],
