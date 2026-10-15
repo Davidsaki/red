@@ -15,6 +15,9 @@ if (!connectionString) {
   process.exit(1);
 }
 
+const label = process.env.DB_LABEL ?? 'desconocida';
+console.log(`\n🔎 Base de datos: ${label}\n`);
+
 const pool = new Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },

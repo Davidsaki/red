@@ -11,6 +11,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "db:query": "node --env-file=.env.local scripts/db-query.mjs",
+    "db:query:prod": "node --env-file=.env.production.local scripts/db-query.mjs",
     "migrate": "node --env-file=.env.local node_modules/node-pg-migrate/bin/node-pg-migrate.js",
     "migrate:up": "npm run migrate -- up",
     "migrate:down": "npm run migrate -- down",
