@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { projectSchema, ProjectFormData } from '@/lib/validations';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import WorkModeFields from '@/components/WorkModeFields';
 
 interface CategoryWithSkills {
   id: number;
@@ -59,7 +60,7 @@ export default function NewProjectPage() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitted },
     setValue,
     watch,
   } = useForm<ProjectFormData>({
@@ -67,10 +68,14 @@ export default function NewProjectPage() {
     defaultValues: {
       skills_required: [],
       budget_currency: 'COP',
+      work_mode: 'remote',
     },
   });
 
   const selectedCategory = watch('category');
+  const workMode = watch('work_mode');
+  const departmentCode = watch('department_code');
+  const municipalityCode = watch('municipality_code');
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -290,6 +295,8 @@ export default function NewProjectPage() {
                 {...register('title')}
                 type="text"
                 id="title"
+                lang="es"
+                spellCheck
                 placeholder="Ej: Instalación eléctrica para apartamento"
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -502,6 +509,23 @@ export default function NewProjectPage() {
               )}
             </div>
 
+            {/* Work mode + location */}
+            <WorkModeFields
+              workMode={workMode}
+              onWorkModeChange={(mode) => setValue('work_mode', mode, { shouldValidate: isSubmitted })}
+              location={
+                departmentCode && municipalityCode
+                  ? { departmentCode, municipalityCode }
+                  : null
+              }
+              onLocationChange={(loc) => {
+                setValue('department_code', loc?.departmentCode, { shouldValidate: isSubmitted });
+                setValue('municipality_code', loc?.municipalityCode, { shouldValidate: isSubmitted });
+              }}
+              workModeError={errors.work_mode?.message}
+              locationError={errors.municipality_code?.message ?? errors.department_code?.message}
+            />
+
             {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
@@ -510,6 +534,8 @@ export default function NewProjectPage() {
               <textarea
                 {...register('description')}
                 id="description"
+                lang="es"
+                spellCheck
                 rows={6}
                 placeholder="Describe en detalle lo que necesitas..."
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"

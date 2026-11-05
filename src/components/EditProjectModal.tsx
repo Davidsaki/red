@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from './Modal';
+import WorkModeFields from './WorkModeFields';
+import { toLocationValue, type LocationValue } from './MunicipalityCombobox';
+import { projectSchema, WORK_MODES, type WorkMode } from '@/lib/validations';
 
 interface CategoryWithSkills {
   id: number;
@@ -22,7 +25,14 @@ interface EditProjectModalProps {
     budget: string;
     budget_currency: string;
     skills_required: string[];
+    work_mode?: string | null;
+    department_code?: string | null;
+    municipality_code?: string | null;
   };
+}
+
+function toWorkMode(value: string | null | undefined): WorkMode {
+  return (WORK_MODES as readonly string[]).includes(value ?? '') ? (value as WorkMode) : 'remote';
 }
 
 function formatCOPInput(value: number | string): string {
@@ -47,6 +57,11 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
   const [budgetValue, setBudgetValue] = useState(parseFloat(project.budget));
   const [selectedSkills, setSelectedSkills] = useState<string[]>(project.skills_required || []);
   const [customSkill, setCustomSkill] = useState('');
+  const [workMode, setWorkMode] = useState<WorkMode>(toWorkMode(project.work_mode));
+  const [location, setLocation] = useState<LocationValue | null>(
+    toLocationValue(project.department_code, project.municipality_code)
+  );
+  const [fieldErrors, setFieldErrors] = useState<{ work_mode?: string; municipality_code?: string }>({});
 
   const [categories, setCategories] = useState<CategoryWithSkills[]>([]);
   const [availableSkills, setAvailableSkills] = useState<string[]>([]);
@@ -66,6 +81,9 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
       setBudgetDisplay(formatCOPInput(parseFloat(project.budget)));
       setBudgetValue(parseFloat(project.budget));
       setSelectedSkills(project.skills_required || []);
+      setWorkMode(toWorkMode(project.work_mode));
+      setLocation(toLocationValue(project.department_code, project.municipality_code));
+      setFieldErrors({});
       setError(null);
       setSuccess(false);
     }
@@ -133,19 +151,42 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setFieldErrors({});
+
+    const payload = {
+      title,
+      description,
+      category,
+      budget: budgetValue,
+      budget_currency: project.budget_currency || 'COP',
+      skills_required: selectedSkills,
+      work_mode: workMode,
+      department_code: location?.departmentCode,
+      municipality_code: location?.municipalityCode,
+    };
+
+    const validation = projectSchema.safeParse(payload);
+    if (!validation.success) {
+      const issues = validation.error.issues;
+      const next: { work_mode?: string; municipality_code?: string } = {};
+      for (const issue of issues) {
+        const key = issue.path[0];
+        if (key === 'work_mode' && !next.work_mode) next.work_mode = issue.message;
+        if ((key === 'municipality_code' || key === 'department_code') && !next.municipality_code) {
+          next.municipality_code = issue.message;
+        }
+      }
+      setFieldErrors(next);
+      if (!next.work_mode && !next.municipality_code) setError(issues[0].message);
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch(`/api/projects/${project.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          description,
-          category,
-          budget: budgetValue,
-          budget_currency: project.budget_currency || 'COP',
-          skills_required: selectedSkills,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -204,6 +245,8 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               <input
                 id="edit-title"
                 type="text"
+                lang="es"
+                spellCheck
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
@@ -276,6 +319,22 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               </div>
             </div>
 
+            {/* Work mode + location */}
+            <WorkModeFields
+              workMode={workMode}
+              onWorkModeChange={(mode) => {
+                setWorkMode(mode);
+                setFieldErrors({});
+              }}
+              location={location}
+              onLocationChange={(loc) => {
+                setLocation(loc);
+                setFieldErrors({});
+              }}
+              workModeError={fieldErrors.work_mode}
+              locationError={fieldErrors.municipality_code}
+            />
+
             {/* Description */}
             <div>
               <label htmlFor="edit-description" className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -283,6 +342,8 @@ export default function EditProjectModal({ isOpen, onClose, project }: EditProje
               </label>
               <textarea
                 id="edit-description"
+                lang="es"
+                spellCheck
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}

@@ -1,5 +1,8 @@
 import Link from 'next/link';
 import CurrencyDisplay from './CurrencyDisplay';
+import { formatLocation } from '@/lib/colombia';
+import { projectStatusStyle } from '@/lib/status';
+import { WORK_MODE_LABELS, type WorkMode } from '@/lib/validations';
 
 interface ProjectCardProps {
   project: {
@@ -15,6 +18,9 @@ interface ProjectCardProps {
     employer_name?: string;
     status: string;
     application_count?: number;
+    work_mode?: string | null;
+    department_code?: string | null;
+    municipality_code?: string | null;
   };
 }
 
@@ -34,6 +40,10 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function ProjectCard({ project }: ProjectCardProps) {
+  const workModeLabel = project.work_mode ? WORK_MODE_LABELS[project.work_mode as WorkMode] : undefined;
+  const location = formatLocation(project.department_code, project.municipality_code);
+  const modalityBadge = workModeLabel ? (location ? `${workModeLabel} · ${location}` : workModeLabel) : null;
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-md transition-all">
       <div className="flex items-start justify-between mb-3">
@@ -42,8 +52,8 @@ export default function ProjectCard({ project }: ProjectCardProps) {
             {project.title}
           </h3>
         </Link>
-        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 shrink-0">
-          {project.status}
+        <span className={`ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${projectStatusStyle(project.status).badge} shrink-0`}>
+          {projectStatusStyle(project.status).label}
         </span>
       </div>
 
@@ -62,6 +72,17 @@ export default function ProjectCard({ project }: ProjectCardProps) {
           currency={(project.budget_currency as 'COP' | 'USD') || 'COP'}
         />
       </div>
+
+      {modalityBadge && (
+        <div className="mb-3">
+          <span
+            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700"
+            data-testid="modality-badge"
+          >
+            {modalityBadge}
+          </span>
+        </div>
+      )}
 
       {project.skills_required && project.skills_required.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-3">

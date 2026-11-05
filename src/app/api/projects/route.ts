@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { sql, pool } from '@/lib/db';
-import { projectSchema } from '@/lib/validations';
+import { projectSchema, normalizeLocation, WORK_MODES, WorkMode } from '@/lib/validations';
+import { getDepartment, getMunicipality } from '@/lib/colombia';
 
 // Get all projects with search, filters, and pagination
 export async function GET(request: NextRequest) {
@@ -16,6 +17,9 @@ export async function GET(request: NextRequest) {
     const budgetMin = searchParams.get('budgetMin');
     const budgetMax = searchParams.get('budgetMax');
     const skills = searchParams.get('skills');
+    const workModeParam = searchParams.get('workMode');
+    const departmentParam = searchParams.get('department');
+    const municipalityParam = searchParams.get('municipality');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = Math.min(parseInt(searchParams.get('limit') || '12', 10), 50);
     const offset = (page - 1) * limit;
@@ -58,6 +62,19 @@ export async function GET(request: NextRequest) {
       const skillsArr = skills.split(',').map((s) => s.trim());
       conditions.push(`p.skills_required && $${paramIndex++}::text[]`);
       params.push(skillsArr);
+    }
+
+    if (workModeParam && (WORK_MODES as readonly string[]).includes(workModeParam)) {
+      conditions.push(`p.work_mode = $${paramIndex++}`);
+      params.push(workModeParam as WorkMode);
+    }
+
+    if (municipalityParam && getMunicipality(municipalityParam)) {
+      conditions.push(`p.municipality_code = $${paramIndex++}`);
+      params.push(municipalityParam);
+    } else if (departmentParam && getDepartment(departmentParam)) {
+      conditions.push(`p.department_code = $${paramIndex++}`);
+      params.push(departmentParam);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -149,7 +166,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { title, description, category, budget, skills_required, budget_currency } = validation.data;
+    const { title, description, category, budget, skills_required, budget_currency, work_mode } = validation.data;
+    const { department_code, municipality_code } = normalizeLocation(validation.data);
 
     // If there's a pending suggestion, get its name for display
     let suggestedCategoryName: string | null = null;
@@ -177,6 +195,9 @@ export async function POST(request: NextRequest) {
         employer_id,
         skills_required,
         suggested_category_name,
+        work_mode,
+        department_code,
+        municipality_code,
         status
       )
       VALUES (
@@ -188,6 +209,9 @@ export async function POST(request: NextRequest) {
         ${user.id},
         ${skillsArray}::text[],
         ${suggestedCategoryName},
+        ${work_mode},
+        ${department_code},
+        ${municipality_code},
         'open'
       )
       RETURNING *

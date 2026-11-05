@@ -47,7 +47,7 @@ describe('ProjectCard', () => {
 
   it('renders status badge', () => {
     render(<ProjectCard project={baseProject} />);
-    expect(screen.getByText('open')).toBeInTheDocument();
+    expect(screen.getByText('Abierto')).toBeInTheDocument();
   });
 
   it('renders employer name', () => {
@@ -107,5 +107,19 @@ describe('ProjectCard', () => {
   it('renders budget via CurrencyDisplay', () => {
     render(<ProjectCard project={baseProject} />);
     expect(screen.getByTestId('currency-display')).toHaveTextContent('COP 500000');
+  });
+
+  it('renders just the modality for remote projects', () => {
+    render(<ProjectCard project={{ ...baseProject, work_mode: 'remote' }} />);
+    expect(screen.getByTestId('modality-badge')).toHaveTextContent(/^Remoto$/);
+  });
+
+  it('renders modality and location for onsite projects', () => {
+    render(
+      <ProjectCard
+        project={{ ...baseProject, work_mode: 'onsite', department_code: '05', municipality_code: '05001' }}
+      />
+    );
+    expect(screen.getByTestId('modality-badge')).toHaveTextContent('Presencial · Medellín, Antioquia');
   });
 });

@@ -15,7 +15,8 @@
     "migrate": "node --env-file=.env.local node_modules/node-pg-migrate/bin/node-pg-migrate.js",
     "migrate:up": "npm run migrate -- up",
     "migrate:down": "npm run migrate -- down",
-    "migrate:create": "npm run migrate -- create"
+    "migrate:create": "npm run migrate -- create",
+    "migrate:prod": "node --env-file=.env.production.local node_modules/node-pg-migrate/bin/node-pg-migrate.js up"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

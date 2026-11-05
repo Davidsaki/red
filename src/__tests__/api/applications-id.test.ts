@@ -102,7 +102,7 @@ describe('PUT /api/applications/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'freelancer@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2 }] })
+      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2, status: 'pending' }] })
       .mockResolvedValueOnce({ rows: [{ id: 1, ...validUpdate }] });
 
     const request = createRequest('http://localhost:3000/api/applications/1', {
@@ -132,7 +132,7 @@ describe('PUT /api/applications/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'other@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 3 }] })
-      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2 }] });
+      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2, status: 'pending' }] });
 
     const request = createRequest('http://localhost:3000/api/applications/1', {
       method: 'PUT',
@@ -166,8 +166,8 @@ describe('DELETE /api/applications/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'freelancer@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2 }] })
-      .mockResolvedValueOnce({ rows: [] });
+      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2, status: 'pending' }] })
+      .mockResolvedValueOnce({ rows: [{ id: 1 }] });
 
     const request = createRequest('http://localhost:3000/api/applications/1', {
       method: 'DELETE',
@@ -194,7 +194,7 @@ describe('DELETE /api/applications/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'other@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 3 }] })
-      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2 }] });
+      .mockResolvedValueOnce({ rows: [{ freelancer_id: 2, status: 'pending' }] });
 
     const request = createRequest('http://localhost:3000/api/applications/1', {
       method: 'DELETE',

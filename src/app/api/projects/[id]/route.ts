@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { sql } from '@/lib/db';
-import { projectSchema } from '@/lib/validations';
+import { projectSchema, normalizeLocation } from '@/lib/validations';
 import { z } from 'zod';
 
 export async function GET(
@@ -95,7 +95,8 @@ export async function PUT(
       );
     }
 
-    const { title, description, category, budget, skills_required, budget_currency } = validation.data;
+    const { title, description, category, budget, skills_required, budget_currency, work_mode } = validation.data;
+    const { department_code, municipality_code } = normalizeLocation(validation.data);
     const skillsArray = `{${skills_required.map(s => `"${s.replace(/"/g, '\\"')}"`).join(',')}}`;
     const currency = budget_currency || 'COP';
 
@@ -107,6 +108,9 @@ export async function PUT(
         budget = ${budget},
         budget_currency = ${currency},
         skills_required = ${skillsArray}::text[],
+        work_mode = ${work_mode},
+        department_code = ${department_code},
+        municipality_code = ${municipality_code},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${projectId}
       RETURNING *
@@ -124,7 +128,7 @@ export async function PUT(
 
 // Change project status
 const statusSchema = z.object({
-  status: z.enum(['closed', 'completed', 'cancelled']),
+  status: z.enum(['closed', 'cancelled']),
 });
 
 export async function PATCH(
@@ -155,19 +159,22 @@ export async function PATCH(
     }
     const userId = userResult.rows[0].id;
 
-    const projectResult = await sql`SELECT employer_id FROM projects WHERE id = ${projectId}`;
+    const projectResult = await sql`SELECT employer_id, status FROM projects WHERE id = ${projectId}`;
     if (projectResult.rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Proyecto no encontrado' }, { status: 404 });
     }
     if (projectResult.rows[0].employer_id !== userId) {
       return NextResponse.json({ success: false, error: 'No tienes permiso para modificar este proyecto' }, { status: 403 });
     }
+    if (projectResult.rows[0].status === 'in_progress') {
+      return NextResponse.json({ success: false, error: 'Un proyecto en ejecución debe completarse o reabrirse antes de cambiar su estado' }, { status: 409 });
+    }
 
     const body = await request.json();
     const validation = statusSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
-        { success: false, error: 'Status inválido. Opciones: closed, completed, cancelled' },
+        { success: false, error: 'Status inválido. Opciones: closed, cancelled' },
         { status: 400 }
       );
     }
@@ -176,9 +183,12 @@ export async function PATCH(
       UPDATE projects SET
         status = ${validation.data.status},
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${projectId}
+      WHERE id = ${projectId} AND status <> 'in_progress'
       RETURNING *
     `;
+    if (result.rows.length === 0) {
+      return NextResponse.json({ success: false, error: 'Un proyecto en ejecución debe completarse o reabrirse antes de cambiar su estado' }, { status: 409 });
+    }
 
     return NextResponse.json({ success: true, project: result.rows[0] });
   } catch (error) {
@@ -219,12 +229,15 @@ export async function DELETE(
     }
     const userId = userResult.rows[0].id;
 
-    const projectResult = await sql`SELECT employer_id FROM projects WHERE id = ${projectId}`;
+    const projectResult = await sql`SELECT employer_id, status FROM projects WHERE id = ${projectId}`;
     if (projectResult.rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Proyecto no encontrado' }, { status: 404 });
     }
     if (projectResult.rows[0].employer_id !== userId) {
       return NextResponse.json({ success: false, error: 'No tienes permiso para eliminar este proyecto' }, { status: 403 });
+    }
+    if (projectResult.rows[0].status === 'in_progress') {
+      return NextResponse.json({ success: false, error: 'No puedes eliminar un proyecto en ejecución; complétalo o reábrelo primero' }, { status: 409 });
     }
 
     // Delete associated applications first, then the project

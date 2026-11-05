@@ -48,3 +48,38 @@ export async function sendMagicLink(email: string, token: string): Promise<void>
     `,
   });
 }
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export async function sendContractorSelectedEmail(
+  email: string,
+  projectId: number,
+  projectTitle: string
+): Promise<void> {
+  const url = `${BASE_URL}/projects/${projectId}`;
+  const { error } = await getResend().emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Te seleccionaron para un proyecto — Red de Contratistas',
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+        <h2 style="color:#111827">¡Te seleccionaron!</h2>
+        <p style="color:#6b7280">Te seleccionaron para el proyecto <strong>${escapeHtml(projectTitle)}</strong>. El contratante se pondrá en contacto contigo.</p>
+        <a href="${url}" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
+          Ver proyecto
+        </a>
+        <p style="margin-top:24px;color:#9ca3af;font-size:12px">Recibes este mensaje porque aplicaste a un proyecto en Red de Contratistas.</p>
+      </div>
+    `,
+  });
+  if (error) {
+    throw new Error(`Resend: ${error.message}`);
+  }
+}

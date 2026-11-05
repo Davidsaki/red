@@ -5,6 +5,10 @@ import { notFound } from 'next/navigation';
 import CurrencyDisplay from '@/components/CurrencyDisplay';
 import ProjectActions from '@/components/ProjectActions';
 import Header from '@/components/Header';
+import SelectContractorButton from '@/components/SelectContractorButton';
+import { projectStatusStyle, applicationStatusStyle } from '@/lib/status';
+import { formatLocation } from '@/lib/colombia';
+import { WORK_MODE_LABELS, type WorkMode } from '@/lib/validations';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -24,13 +28,6 @@ function timeAgo(dateStr: string): string {
   if (diffMins > 0) return `hace ${diffMins} minuto(s)`;
   return 'ahora mismo';
 }
-
-const statusConfig: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-  open: { label: 'Abierto', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
-  closed: { label: 'Cerrado', dot: 'bg-yellow-500', bg: 'bg-yellow-50', text: 'text-yellow-700' },
-  completed: { label: 'Completado', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
-  cancelled: { label: 'Cancelado', dot: 'bg-gray-400', bg: 'bg-gray-50', text: 'text-gray-600' },
-};
 
 export default async function ProjectDetailPage({ params }: ProjectDetailPageProps) {
   const { id } = await params;
@@ -86,7 +83,10 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
     applications = appResult.rows;
   }
 
-  const status = statusConfig[project.status] || statusConfig.open;
+  const status = projectStatusStyle(project.status);
+  const acceptedApplication = applications.find((a) => a.status === 'accepted');
+  const otherApplications = applications.filter((a) => a.status !== 'accepted');
+  const location = formatLocation(project.department_code, project.municipality_code);
 
   return (
     <div className="min-h-screen bg-gray-50/80">
@@ -109,7 +109,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
           <div className="p-5 sm:p-7">
             {/* Status + Time */}
             <div className="flex items-center gap-3 mb-4">
-              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${status.bg} ${status.text}`}>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${status.badge}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
                 {status.label}
               </span>
@@ -134,6 +134,16 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 amount={parseFloat(project.budget)}
                 currency={project.budget_currency || 'COP'}
               />
+              {project.work_mode && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                  {WORK_MODE_LABELS[project.work_mode as WorkMode] ?? project.work_mode}
+                </span>
+              )}
+              {location && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-600">
+                  {location}
+                </span>
+              )}
             </div>
 
             {/* Description */}
@@ -206,11 +216,39 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                 </span>
               </div>
 
+              {acceptedApplication && (
+                <div className="mb-4 p-4 bg-green-50 rounded-xl border border-green-200">
+                  <p className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-2">Contratista seleccionado</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      {acceptedApplication.freelancer_image ? (
+                        <img src={acceptedApplication.freelancer_image} alt={acceptedApplication.freelancer_name} className="w-9 h-9 rounded-full" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-sm font-medium text-green-700">
+                          {acceptedApplication.freelancer_name?.charAt(0)?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{acceptedApplication.freelancer_name}</p>
+                        <p className="text-xs text-gray-500 truncate">{acceptedApplication.freelancer_email}</p>
+                      </div>
+                    </div>
+                    {acceptedApplication.bid && (
+                      <CurrencyDisplay
+                        amount={parseFloat(acceptedApplication.bid)}
+                        currency={project.budget_currency || 'COP'}
+                      />
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap mt-3">{acceptedApplication.proposal}</p>
+                </div>
+              )}
+
               {applications.length === 0 ? (
                 <p className="text-sm text-gray-400 py-4 text-center">Aún no hay aplicaciones.</p>
               ) : (
                 <div className="space-y-3">
-                  {applications.map((app: any) => (
+                  {otherApplications.map((app: any) => (
                     <div key={app.id} className="p-4 bg-gray-50/50 rounded-xl border border-gray-100">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2.5">
@@ -233,17 +271,18 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                               currency={project.budget_currency || 'COP'}
                             />
                           )}
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${
-                            app.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
-                            app.status === 'accepted' ? 'bg-green-50 text-green-700' :
-                            'bg-red-50 text-red-700'
-                          }`}>
-                            {app.status}
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium ${applicationStatusStyle(app.status).badge}`}>
+                            {applicationStatusStyle(app.status).label}
                           </span>
                         </div>
                       </div>
                       <p className="text-sm text-gray-600 whitespace-pre-wrap">{app.proposal}</p>
-                      <p className="text-xs text-gray-400 mt-2">{timeAgo(app.created_at)}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-xs text-gray-400">{timeAgo(app.created_at)}</p>
+                        {app.status === 'pending' && project.status === 'open' && (
+                          <SelectContractorButton applicationId={app.id} contractorName={app.freelancer_name} />
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

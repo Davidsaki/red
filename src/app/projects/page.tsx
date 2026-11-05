@@ -5,6 +5,8 @@ import ProjectFilters from '@/components/ProjectFilters';
 import Pagination from '@/components/Pagination';
 import Header from '@/components/Header';
 import { Suspense } from 'react';
+import { WORK_MODES } from '@/lib/validations';
+import { getDepartment, getMunicipality } from '@/lib/colombia';
 
 interface ProjectsPageProps {
   searchParams: Promise<{ [key: string]: string | undefined }>;
@@ -29,7 +31,7 @@ async function getCategories() {
 }
 
 async function getProjects(params: { [key: string]: string | undefined }) {
-  const { search, category, budgetMin, budgetMax, skills, page = '1' } = params;
+  const { search, category, budgetMin, budgetMax, skills, workMode, department, municipality, page = '1' } = params;
   const limit = 12;
   const offset = (parseInt(page, 10) - 1) * limit;
 
@@ -64,6 +66,19 @@ async function getProjects(params: { [key: string]: string | undefined }) {
       conditions.push(`p.skills_required && $${paramIndex++}::text[]`);
       queryParams.push(skillsArr);
     }
+  }
+
+  if (workMode && (WORK_MODES as readonly string[]).includes(workMode)) {
+    conditions.push(`p.work_mode = $${paramIndex++}`);
+    queryParams.push(workMode);
+  }
+
+  if (municipality && getMunicipality(municipality)) {
+    conditions.push(`p.municipality_code = $${paramIndex++}`);
+    queryParams.push(municipality);
+  } else if (department && getDepartment(department)) {
+    conditions.push(`p.department_code = $${paramIndex++}`);
+    queryParams.push(department);
   }
 
   const whereClause = `WHERE ${conditions.join(' AND ')}`;

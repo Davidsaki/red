@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import MunicipalityCombobox, { toLocationValue } from '@/components/MunicipalityCombobox';
+import { getDepartment, getMunicipality, listDepartments } from '@/lib/colombia';
+import { WORK_MODES, WORK_MODE_LABELS, type WorkMode } from '@/lib/validations';
 
 interface Category {
   id: number;
@@ -38,6 +41,17 @@ export default function ProjectFilters({ categories }: { categories: Category[] 
     searchParams.get('skills')?.split(',').filter(Boolean) || []
   );
 
+  const initialWorkMode = searchParams.get('workMode') || '';
+  const [workMode, setWorkMode] = useState<string>(
+    (WORK_MODES as readonly string[]).includes(initialWorkMode) ? initialWorkMode : ''
+  );
+  const initialMunicipality = getMunicipality(searchParams.get('municipality'));
+  const initialDepartment = getDepartment(searchParams.get('department'));
+  const [department, setDepartment] = useState<string>(
+    initialMunicipality?.departmentCode ?? initialDepartment?.code ?? ''
+  );
+  const [municipality, setMunicipality] = useState<string>(initialMunicipality?.code ?? '');
+
   const availableSkills = category
     ? categories.find((c) => c.name === category)?.skills.map((s) => s.name) || []
     : [];
@@ -51,17 +65,23 @@ export default function ProjectFilters({ categories }: { categories: Category[] 
       const finalBudgetMin = overrides?.budgetMin ?? budgetMin;
       const finalBudgetMax = overrides?.budgetMax ?? budgetMax;
       const finalSkills = overrides?.skills ?? selectedSkills.join(',');
+      const finalWorkMode = overrides?.workMode ?? workMode;
+      const finalDepartment = overrides?.department ?? department;
+      const finalMunicipality = overrides?.municipality ?? municipality;
 
       if (finalSearch) params.set('search', finalSearch);
       if (finalCategory) params.set('category', finalCategory);
       if (finalBudgetMin) params.set('budgetMin', finalBudgetMin);
       if (finalBudgetMax) params.set('budgetMax', finalBudgetMax);
       if (finalSkills) params.set('skills', finalSkills);
+      if (finalWorkMode) params.set('workMode', finalWorkMode);
+      if (finalDepartment) params.set('department', finalDepartment);
+      if (finalMunicipality) params.set('municipality', finalMunicipality);
       params.set('page', '1');
 
       router.push(`/projects?${params.toString()}`);
     },
-    [search, category, budgetMin, budgetMax, selectedSkills, router]
+    [search, category, budgetMin, budgetMax, selectedSkills, workMode, department, municipality, router]
   );
 
   // Debounced search
@@ -89,6 +109,26 @@ export default function ProjectFilters({ categories }: { categories: Category[] 
     updateURL({ skills: newSkills.join(',') });
   }
 
+  function toggleWorkMode(mode: WorkMode): void {
+    const next = workMode === mode ? '' : mode;
+    setWorkMode(next);
+    updateURL({ workMode: next });
+  }
+
+  function handleDepartmentChange(code: string): void {
+    setDepartment(code);
+    setMunicipality('');
+    updateURL({ department: code, municipality: '' });
+  }
+
+  function handleMunicipalityChange(value: { departmentCode: string; municipalityCode: string } | null): void {
+    const nextDept = value?.departmentCode ?? department;
+    const nextMpio = value?.municipalityCode ?? '';
+    setDepartment(nextDept);
+    setMunicipality(nextMpio);
+    updateURL({ department: nextDept, municipality: nextMpio });
+  }
+
   function handleBudgetMinChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const raw = parseCOPInput(e.target.value);
     setBudgetMin(raw);
@@ -113,10 +153,14 @@ export default function ProjectFilters({ categories }: { categories: Category[] 
     setBudgetMinDisplay('');
     setBudgetMaxDisplay('');
     setSelectedSkills([]);
+    setWorkMode('');
+    setDepartment('');
+    setMunicipality('');
     router.push('/projects');
   }
 
-  const hasFilters = search || category || budgetMin || budgetMax || selectedSkills.length > 0;
+  const hasFilters =
+    search || category || budgetMin || budgetMax || selectedSkills.length > 0 || workMode || department || municipality;
 
   return (
     <div className="space-y-6">
@@ -171,6 +215,55 @@ export default function ProjectFilters({ categories }: { categories: Category[] 
           </div>
         </div>
       )}
+
+      {/* Work mode */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Modalidad</label>
+        <div className="flex flex-wrap gap-1.5">
+          {WORK_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              aria-pressed={workMode === mode}
+              onClick={() => toggleWorkMode(mode)}
+              className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                workMode === mode
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:border-blue-500'
+              }`}
+            >
+              {WORK_MODE_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Location */}
+      <div className="space-y-2">
+        <label htmlFor="filter-department" className="block text-sm font-medium text-gray-700">
+          Ubicación
+        </label>
+        <select
+          id="filter-department"
+          value={department}
+          onChange={(e) => handleDepartmentChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+        >
+          <option value="">Todos los departamentos</option>
+          {listDepartments().map((dept) => (
+            <option key={dept.code} value={dept.code}>
+              {dept.name}
+            </option>
+          ))}
+        </select>
+        <MunicipalityCombobox
+          key={department}
+          value={toLocationValue(department, municipality)}
+          onChange={handleMunicipalityChange}
+          departmentCode={department || undefined}
+          placeholder="Todos los municipios"
+        />
+      </div>
 
       {/* Budget Range */}
       <div>

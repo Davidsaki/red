@@ -72,13 +72,14 @@ describe('PUT /api/projects/[id]', () => {
     category: 'Desarrollo Web',
     budget: 600000,
     skills_required: ['TypeScript', 'Next.js'],
+    work_mode: 'remote',
   };
 
   it('updates project with valid data', async () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 1 }] }) // user lookup
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] }) // project ownership
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] }) // project ownership
       .mockResolvedValueOnce({ rows: [{ id: 1, ...validBody }] }); // update
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
@@ -109,7 +110,7 @@ describe('PUT /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'other@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 2 }] }) // user lookup (different user)
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] }); // project belongs to user 1
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] }); // project belongs to user 1
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
       method: 'PUT',
@@ -124,7 +125,7 @@ describe('PUT /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] });
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] });
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
       method: 'PUT',
@@ -143,7 +144,7 @@ describe('PATCH /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] })
       .mockResolvedValueOnce({ rows: [{ id: 1, status: 'closed' }] });
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
@@ -161,7 +162,7 @@ describe('PATCH /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] });
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] });
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
       method: 'PATCH',
@@ -192,7 +193,7 @@ describe('DELETE /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 1 }] })
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] })
       .mockResolvedValueOnce({ rows: [] }) // delete applications
       .mockResolvedValueOnce({ rows: [] }); // delete project
 
@@ -221,7 +222,7 @@ describe('DELETE /api/projects/[id]', () => {
     mockGetServerSession.mockResolvedValue({ user: { email: 'other@example.com' } });
     mockSql
       .mockResolvedValueOnce({ rows: [{ id: 2 }] })
-      .mockResolvedValueOnce({ rows: [{ employer_id: 1 }] });
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'open' }] });
 
     const request = createRequest('http://localhost:3000/api/projects/1', {
       method: 'DELETE',

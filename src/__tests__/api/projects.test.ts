@@ -119,6 +119,7 @@ describe('POST /api/projects', () => {
     category: 'Desarrollo Web',
     budget: 500000,
     skills_required: ['JavaScript', 'React'],
+    work_mode: 'remote',
   };
 
   it('creates project with valid data', async () => {

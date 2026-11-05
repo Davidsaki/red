@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { projectSchema, ProjectFormData } from '@/lib/validations';
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
+import WorkModeFields from '@/components/WorkModeFields';
 
 interface CategoryWithSkills {
   id: number;
@@ -48,7 +49,7 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitted },
     setValue,
     watch,
     reset,
@@ -57,10 +58,14 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
     defaultValues: {
       skills_required: [],
       budget_currency: 'COP',
+      work_mode: 'remote',
     },
   });
 
   const selectedCategory = watch('category');
+  const workMode = watch('work_mode');
+  const departmentCode = watch('department_code');
+  const municipalityCode = watch('municipality_code');
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -102,6 +107,9 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
           budget: parseFloat(p.budget),
           budget_currency: p.budget_currency || 'COP',
           skills_required: p.skills_required || [],
+          work_mode: p.work_mode || 'remote',
+          department_code: p.department_code || undefined,
+          municipality_code: p.municipality_code || undefined,
         });
         setSelectedCategoryName(p.category);
         setSelectedSkills(p.skills_required || []);
@@ -232,6 +240,8 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
                 {...register('title')}
                 type="text"
                 id="title"
+                lang="es"
+                spellCheck
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               {errors.title && (
@@ -332,6 +342,23 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
 
+            {/* Work mode + location */}
+            <WorkModeFields
+              workMode={workMode}
+              onWorkModeChange={(mode) => setValue('work_mode', mode, { shouldValidate: isSubmitted })}
+              location={
+                departmentCode && municipalityCode
+                  ? { departmentCode, municipalityCode }
+                  : null
+              }
+              onLocationChange={(loc) => {
+                setValue('department_code', loc?.departmentCode, { shouldValidate: isSubmitted });
+                setValue('municipality_code', loc?.municipalityCode, { shouldValidate: isSubmitted });
+              }}
+              workModeError={errors.work_mode?.message}
+              locationError={errors.municipality_code?.message ?? errors.department_code?.message}
+            />
+
             {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
@@ -340,6 +367,8 @@ export default function EditProjectPage({ params }: { params: Promise<{ id: stri
               <textarea
                 {...register('description')}
                 id="description"
+                lang="es"
+                spellCheck
                 rows={6}
                 className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />

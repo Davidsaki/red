@@ -1,3 +1,4 @@
+import { projectStatusStyle } from '@/lib/status';
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { sql, pool } from "@/lib/db";
@@ -163,8 +164,8 @@ export default async function DashboardPage() {
                         {project.title}
                       </Link>
                       <div className="flex flex-wrap items-center gap-2 mt-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          {project.status}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${projectStatusStyle(project.status).badge}`}>
+                          {projectStatusStyle(project.status).label}
                         </span>
                         <span className="text-sm text-gray-500">
                           {project.category === 'Otro' && project.suggested_category_name

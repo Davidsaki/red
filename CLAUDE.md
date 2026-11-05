@@ -465,7 +465,7 @@ Headers are configured in `next.config.ts` and applied to all routes:
 1. `npm run migrate:create descriptive-name` — creates a timestamped file in `/migrations`.
 2. Edit the generated file's `up`/`down` using the `pgm` API (see existing migrations for patterns like `pgm.createTable`, `pgm.addColumn`).
 3. `npm run migrate:up` to apply it locally and confirm it works.
-4. Commit the migration file. Run `npm run migrate:up` again against production after deploying (there's no auto-run-on-deploy step yet — see Future Enhancements).
+4. Commit the migration file. Run `npm run migrate:prod` (reads `.env.production.local`) **before** pushing the code that depends on it — migrations here are additive, so old code keeps working against the new schema, but new code fails against the old one. Check production data first with `npm run db:query:prod` if the migration adds constraints. There's no auto-run-on-deploy step yet.
 5. To undo the last migration locally: `npm run migrate:down`.
 
 ## Lessons Learned & Best Practices

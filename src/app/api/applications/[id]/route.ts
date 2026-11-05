@@ -6,7 +6,7 @@ import { sql } from '@/lib/db';
 import { z } from 'zod';
 
 const updateSchema = z.object({
-  proposal: z.string().min(50, 'La propuesta debe tener al menos 50 caracteres').max(5000, 'La propuesta es demasiado larga'),
+  proposal: z.string().min(20, 'La propuesta debe tener al menos 20 caracteres').max(5000, 'La propuesta es demasiado larga'),
   bid: z.number().positive('La oferta debe ser un número positivo').optional(),
 });
 
@@ -82,12 +82,15 @@ export async function PUT(
     const userId = userResult.rows[0].id;
 
     // Verify ownership
-    const appResult = await sql`SELECT freelancer_id FROM applications WHERE id = ${appId}`;
+    const appResult = await sql`SELECT freelancer_id, status FROM applications WHERE id = ${appId}`;
     if (appResult.rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Aplicación no encontrada' }, { status: 404 });
     }
     if (appResult.rows[0].freelancer_id !== userId) {
       return NextResponse.json({ success: false, error: 'No tienes permiso para editar esta aplicación' }, { status: 403 });
+    }
+    if (appResult.rows[0].status !== 'pending') {
+      return NextResponse.json({ success: false, error: 'Solo puedes editar una aplicación mientras está pendiente' }, { status: 409 });
     }
 
     const body = await request.json();
@@ -104,9 +107,12 @@ export async function PUT(
       UPDATE applications SET
         proposal = ${proposal},
         bid = ${bid ?? null}
-      WHERE id = ${appId}
+      WHERE id = ${appId} AND status = 'pending'
       RETURNING *
     `;
+    if (result.rows.length === 0) {
+      return NextResponse.json({ success: false, error: 'Solo puedes editar una aplicación mientras está pendiente' }, { status: 409 });
+    }
 
     return NextResponse.json({ success: true, application: result.rows[0] });
   } catch (error) {
@@ -139,15 +145,21 @@ export async function DELETE(
     const userId = userResult.rows[0].id;
 
     // Verify ownership
-    const appResult = await sql`SELECT freelancer_id FROM applications WHERE id = ${appId}`;
+    const appResult = await sql`SELECT freelancer_id, status FROM applications WHERE id = ${appId}`;
     if (appResult.rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Aplicación no encontrada' }, { status: 404 });
     }
     if (appResult.rows[0].freelancer_id !== userId) {
       return NextResponse.json({ success: false, error: 'No tienes permiso para eliminar esta aplicación' }, { status: 403 });
     }
+    if (appResult.rows[0].status !== 'pending') {
+      return NextResponse.json({ success: false, error: 'Solo puedes eliminar una aplicación mientras está pendiente' }, { status: 409 });
+    }
 
-    await sql`DELETE FROM applications WHERE id = ${appId}`;
+    const deleted = await sql`DELETE FROM applications WHERE id = ${appId} AND status = 'pending' RETURNING id`;
+    if (deleted.rows.length === 0) {
+      return NextResponse.json({ success: false, error: 'Solo puedes eliminar una aplicación mientras está pendiente' }, { status: 409 });
+    }
 
     return NextResponse.json({ success: true, message: 'Aplicación eliminada exitosamente' });
   } catch (error) {

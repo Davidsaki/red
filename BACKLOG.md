@@ -71,33 +71,52 @@ Flujo base que debe funcionar sin fricción antes de cualquier otra cosa:
 - **Cómo verificar:** En login, elegir "Entrar con link" → escribir email →
   recibir correo → clic → sesión activa en dashboard.
 
-### Historia: Ciclo de vida del proyecto
+### Historia: Ubicación y modalidad del proyecto (Fase 1 — oct 2026)
 **Depende de:** nada
-**Prioridad:** Alta — necesaria antes de calificaciones
+**Prioridad:** Alta
 
-- **Qué hace:** Cuando el empleador acepta una propuesta, el proyecto cambia a
-  `en progreso` y se cierran las postulaciones. El empleador puede luego
-  marcarlo como `completado` desde su dashboard.
-- **No hace:** No notifica por email (historia separada). No permite reabrir
-  el proyecto una vez cerrado en este MVP.
-- **Cómo verificar:** Aceptar propuesta → otras aplicaciones quedan bloqueadas
-  → botón "marcar como completado" aparece → estado cambia en dashboard.
+- **Qué hace:** Cada proyecto tiene modalidad (Remoto / Híbrido / Presencial)
+  y ubicación departamento + municipio, elegida de la lista oficial DANE
+  (DIVIPOLA) con un buscador que filtra en tiempo real, sin importar tildes.
+  Los mismos campos están en los filtros de `/projects`.
+- **Reglas:** Híbrido y Presencial exigen municipio. Remoto lo deja opcional.
+- **Cómo verificar:** Crear proyecto presencial → escribir "mede" → elegir
+  "Medellín, Antioquia" → aparece en el detalle → filtrar por Antioquia en
+  `/projects` lo muestra.
 
-### Historia: Calificación del contratista
-**Depende de:** Ciclo de vida del proyecto
+### Historia: Selección del contratista y ciclo de vida (Fase 2 — oct 2026)
+**Depende de:** Resend (ya activo)
+**Prioridad:** Alta — reemplaza la historia anterior "Ciclo de vida del proyecto"
+
+- **Qué hace:** El empleador elige a un aplicante con "Seleccionar" → la
+  aplicación queda *Seleccionada*, el proyecto pasa a *En ejecución* y el
+  contratista recibe un email. Desde *En ejecución* el empleador puede
+  "Marcar como completado" o "Reabrir para buscar otro contratista" (vuelve
+  a *Abierto*; la contratación anterior queda como *trabajo finalizado*).
+- **Decisiones:** Los demás aplicantes **quedan en espera** (no se rechazan
+  ni se notifican), para poder elegir a otro si se reabre. No se aceptan
+  aplicaciones nuevas mientras está en ejecución.
+- **Cómo verificar:** Seleccionar aplicante → llega email → proyecto en
+  ejecución → reabrir → elegir a otro aplicante sin que vuelva a aplicar.
+- **Pendiente antes de abrir a usuarios reales:** bloquear aplicar al proyecto
+  propio (hoy se permite a propósito para probar con una sola cuenta).
+
+### Historia: Calificación del contratista (Fase 3 — oct 2026)
+**Depende de:** Selección del contratista
 **Prioridad:** Alta — clave para generar confianza en la plataforma
 
-- **Qué hace:** Al completar un proyecto, el empleador califica al contratista
-  con estrellas (1-5) y comentario opcional. Las calificaciones se acumulan
-  en el perfil del contratista y son visibles para otros empleadores.
-- **No hace:** El contratista no califica al empleador en este MVP (v2).
-  No hay calificación anónima — siempre está ligada al proyecto.
-- **Incentivo:** Para crear un nuevo proyecto, el empleador debe haber
-  calificado sus proyectos completados anteriores. Si tiene uno pendiente,
-  se le muestra aviso y se redirige a calificar primero.
-- **Cómo verificar:** Completar proyecto → aparece formulario de calificación
-  → si se omite, al intentar crear proyecto nuevo aparece bloqueo con link
-  al pendiente.
+- **Qué hace:** Al terminar cada contratación (completada o reabierta), el
+  empleador califica al contratista con 1-5 estrellas y comentario opcional.
+  La calificación va ligada a la contratación, no al proyecto (un proyecto
+  reabierto puede tener varios contratistas calificados). El promedio y la
+  cantidad de reseñas se muestran junto al nombre del contratista cuando
+  aplica a otros proyectos.
+- **Decisiones:** Calificar es **opcional** — se muestra un recordatorio de
+  "calificación pendiente" en el dashboard, pero nunca bloquea nada. Solo el
+  empleador califica al contratista (calificar al empleador queda para v2).
+  Una mala calificación no bloquea al contratista, solo baja su promedio.
+- **Cómo verificar:** Completar contratación → aparece formulario de estrellas
+  → el promedio se ve en la próxima aplicación de ese contratista.
 
 ---
 
@@ -111,6 +130,11 @@ El empleador escribe una descripción corta y un agente la expande en un
 proyecto bien estructurado: título, descripción clara, skills sugeridos,
 presupuesto estimado.
 **Por qué:** Los proyectos mal redactados no reciben buenas postulaciones.
+**Forma acordada (nov 2026):** botón "Mejorar redacción" en crear/editar
+proyecto que propone una versión corregida y estructurada de la descripción
+(y sugiere habilidades). El usuario acepta o descarta; nunca bloquea publicar.
+Prioridad: después de la Fase 3 (calificaciones). Mientras tanto, título y
+descripción ya tienen el corrector del navegador en español (`lang="es"`).
 **Stack:** Vercel AI SDK + Claude API
 
 ### 2. Asistente de propuesta para freelancers

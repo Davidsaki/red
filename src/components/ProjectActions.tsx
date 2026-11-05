@@ -7,6 +7,8 @@ import EditProjectModal from './EditProjectModal';
 import ProjectCloseButton from './ProjectCloseButton';
 import ProjectDeleteButton from './ProjectDeleteButton';
 import Modal from './Modal';
+import ProjectExecutionActions from './ProjectExecutionActions';
+import { applicationStatusStyle } from '@/lib/status';
 
 interface UserApplication {
   id: number;
@@ -26,6 +28,9 @@ interface ProjectActionsProps {
     budget_currency: string;
     skills_required: string[];
     status: string;
+    work_mode?: string | null;
+    department_code?: string | null;
+    municipality_code?: string | null;
   };
   isOwner: boolean;
   isAuthenticated: boolean;
@@ -153,14 +158,17 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
                 </div>
                 <span className="text-sm font-medium text-green-700">Tu aplicación</span>
               </div>
-              <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
-                userApplication.status === 'pending' ? 'bg-yellow-50 text-yellow-700' :
-                userApplication.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                'bg-red-50 text-red-700'
-              }`}>
-                {userApplication.status}
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${applicationStatusStyle(userApplication.status).badge}`}>
+                {applicationStatusStyle(userApplication.status).label}
               </span>
             </div>
+
+            {userApplication.status === 'accepted' && (
+              <div className="mb-3 p-3 bg-green-100 border border-green-200 rounded-lg">
+                <p className="text-sm font-semibold text-green-800">¡Te seleccionaron!</p>
+                <p className="text-xs text-green-700 mt-0.5">El contratante se pondrá en contacto contigo.</p>
+              </div>
+            )}
 
             <p className="text-sm text-gray-600 line-clamp-3 mb-2">{userApplication.proposal}</p>
 
@@ -170,23 +178,25 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
               </p>
             )}
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={openEditApp}
-                className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={deleteApp}
-                disabled={isDeletingApp}
-                className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 transition-colors"
-              >
-                {isDeletingApp ? 'Eliminando...' : 'Eliminar'}
-              </button>
-            </div>
+            {userApplication.status === 'pending' && (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={openEditApp}
+                  className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={deleteApp}
+                  disabled={isDeletingApp}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {isDeletingApp ? 'Eliminando...' : 'Eliminar'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -215,10 +225,15 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
             >
               Editar
             </button>
+            {project.status === 'in_progress' && (
+              <ProjectExecutionActions projectId={project.id} />
+            )}
             {project.status === 'open' && (
               <ProjectCloseButton projectId={project.id} />
             )}
-            <ProjectDeleteButton projectId={project.id} />
+            {project.status !== 'in_progress' && (
+              <ProjectDeleteButton projectId={project.id} />
+            )}
           </div>
         </div>
       )}
@@ -260,8 +275,8 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
               placeholder="Incluye tus datos de contacto: teléfono, WhatsApp, email u otro medio."
               className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-shadow"
             />
-            <p className={`mt-1 text-xs ${editProposal.length >= 50 ? 'text-green-600' : 'text-gray-400'}`}>
-              {editProposal.length}/50 caracteres mínimo
+            <p className={`mt-1 text-xs ${editProposal.length >= 20 ? 'text-green-600' : 'text-gray-400'}`}>
+              {editProposal.length}/20 caracteres mínimo
             </p>
           </div>
 
@@ -288,7 +303,7 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
             <button
               type="button"
               onClick={saveEditApp}
-              disabled={editSubmitting || editProposal.length < 50}
+              disabled={editSubmitting || editProposal.length < 20}
               className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
             >
               {editSubmitting ? 'Guardando...' : 'Guardar Cambios'}

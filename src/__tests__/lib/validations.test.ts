@@ -12,6 +12,7 @@ describe('projectSchema', () => {
     category: 'Desarrollo Web',
     budget: 500000,
     skills_required: ['JavaScript', 'React'],
+    work_mode: 'remote',
   };
 
   it('accepts valid data', () => {
@@ -22,6 +23,71 @@ describe('projectSchema', () => {
   it('accepts valid data with optional budget_currency', () => {
     const result = projectSchema.safeParse({ ...validProject, budget_currency: 'USD' });
     expect(result.success).toBe(true);
+  });
+
+  describe('work mode and location', () => {
+    it('accepts remote without location', () => {
+      expect(projectSchema.safeParse(validProject).success).toBe(true);
+    });
+
+    it('accepts remote with an optional location', () => {
+      const result = projectSchema.safeParse({ ...validProject, department_code: '05', municipality_code: '05001' });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects missing work_mode', () => {
+      const { work_mode: omitted, ...rest } = validProject;
+      void omitted;
+      expect(projectSchema.safeParse(rest).success).toBe(false);
+    });
+
+    it('rejects unknown work_mode', () => {
+      expect(projectSchema.safeParse({ ...validProject, work_mode: 'moon' }).success).toBe(false);
+    });
+
+    it.each(['hybrid', 'onsite'])('rejects %s without municipality, error on municipality field', (mode) => {
+      const result = projectSchema.safeParse({ ...validProject, work_mode: mode });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const issue = result.error.issues.find((i) => i.path[0] === 'municipality_code');
+        expect(issue?.message).toMatch(/municipio/i);
+      }
+    });
+
+    it('accepts onsite with a valid department/municipality pair', () => {
+      const result = projectSchema.safeParse({
+        ...validProject,
+        work_mode: 'onsite',
+        department_code: '05',
+        municipality_code: '05001',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects unknown municipality code', () => {
+      const result = projectSchema.safeParse({ ...validProject, department_code: '05', municipality_code: '99999' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects municipality that does not belong to the department', () => {
+      const result = projectSchema.safeParse({
+        ...validProject,
+        work_mode: 'hybrid',
+        department_code: '11',
+        municipality_code: '05001',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects municipality without department', () => {
+      const result = projectSchema.safeParse({ ...validProject, municipality_code: '05001' });
+      expect(result.success).toBe(false);
+    });
+
+    it('treats empty strings as no location for remote', () => {
+      const result = projectSchema.safeParse({ ...validProject, department_code: '', municipality_code: '' });
+      expect(result.success).toBe(true);
+    });
   });
 
   it('rejects title shorter than 5 characters', () => {
@@ -89,9 +155,14 @@ describe('applicationSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects proposal shorter than 50 characters', () => {
+  it('rejects proposal shorter than 20 characters', () => {
     const result = applicationSchema.safeParse({ ...validApplication, proposal: 'Corta' });
     expect(result.success).toBe(false);
+  });
+
+  it('enforces the 20 character proposal minimum at the boundary', () => {
+    expect(applicationSchema.safeParse({ ...validApplication, proposal: 'a'.repeat(19) }).success).toBe(false);
+    expect(applicationSchema.safeParse({ ...validApplication, proposal: 'a'.repeat(20) }).success).toBe(true);
   });
 
   it('rejects negative bid', () => {

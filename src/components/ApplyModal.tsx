@@ -154,8 +154,8 @@ export default function ApplyModal({
                 placeholder={"Describe tu experiencia, cómo abordarías el proyecto, y por qué eres la persona indicada.\n\nIncluye tus datos de contacto: teléfono, WhatsApp, email u otro medio por el que te puedan contactar."}
                 className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-shadow"
               />
-              <p className={`mt-1 text-xs ${proposal.length >= 50 ? 'text-green-600' : 'text-gray-400'}`}>
-                {proposal.length}/50 caracteres mínimo
+              <p className={`mt-1 text-xs ${proposal.length >= 20 ? 'text-green-600' : 'text-gray-400'}`}>
+                {proposal.length}/20 caracteres mínimo
               </p>
             </div>
 
@@ -201,7 +201,7 @@ export default function ApplyModal({
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
-                disabled={isSubmitting || proposal.length < 50}
+                disabled={isSubmitting || proposal.length < 20}
                 className="flex-1 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
               >
                 {isSubmitting ? 'Enviando...' : 'Enviar Aplicación'}
