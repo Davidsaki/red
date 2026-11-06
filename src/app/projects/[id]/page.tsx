@@ -6,6 +6,10 @@ import CurrencyDisplay from '@/components/CurrencyDisplay';
 import ProjectActions from '@/components/ProjectActions';
 import Header from '@/components/Header';
 import SelectContractorButton from '@/components/SelectContractorButton';
+import RatingSummary from '@/components/RatingSummary';
+import StarsDisplay from '@/components/StarsDisplay';
+import FinishedEngagementReview from '@/components/FinishedEngagementReview';
+import { getContractorRatings } from '@/lib/reviews';
 import { projectStatusStyle, applicationStatusStyle } from '@/lib/status';
 import { formatLocation } from '@/lib/colombia';
 import { WORK_MODE_LABELS, type WorkMode } from '@/lib/validations';
@@ -55,13 +59,16 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
 
   // Check if user already applied and fetch their application
   let hasApplied = false;
-  let userApplication: { id: number; proposal: string; bid: string | null; status: string; created_at: string } | null = null;
+  let userApplication: { id: number; proposal: string; bid: string | null; status: string; created_at: string; review_rating: number | null; review_comment: string | null } | null = null;
   if (isAuthenticated) {
     const userResult = await sql`SELECT id FROM users WHERE email = ${session!.user.email}`;
     if (userResult.rows.length > 0) {
       const appResult = await sql`
-        SELECT id, proposal, bid, status, created_at FROM applications
-        WHERE project_id = ${projectId} AND freelancer_id = ${userResult.rows[0].id}
+        SELECT a.id, a.proposal, a.bid, a.status, a.created_at,
+               r.rating AS review_rating, r.comment AS review_comment
+        FROM applications a
+        LEFT JOIN reviews r ON r.application_id = a.id
+        WHERE a.project_id = ${projectId} AND a.freelancer_id = ${userResult.rows[0].id}
       `;
       if (appResult.rows.length > 0) {
         hasApplied = true;
@@ -74,18 +81,26 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
   let applications: any[] = [];
   if (isOwner) {
     const appResult = await sql`
-      SELECT a.*, u.name as freelancer_name, u.email as freelancer_email, u.image as freelancer_image
+      SELECT a.*, u.name as freelancer_name, u.email as freelancer_email, u.image as freelancer_image,
+             r.rating AS review_rating, r.comment AS review_comment
       FROM applications a
       JOIN users u ON a.freelancer_id = u.id
+      LEFT JOIN reviews r ON r.application_id = a.id
       WHERE a.project_id = ${projectId}
       ORDER BY a.created_at DESC
     `;
     applications = appResult.rows;
   }
 
+  const ratings = await getContractorRatings([
+    ...new Set<number>(applications.map((a) => a.freelancer_id)),
+  ]);
+
+  const hasFinishedApplications = applications.some((a) => a.status === 'finished');
   const status = projectStatusStyle(project.status);
   const acceptedApplication = applications.find((a) => a.status === 'accepted');
-  const otherApplications = applications.filter((a) => a.status !== 'accepted');
+  const finishedApplications = applications.filter((a) => a.status === 'finished');
+  const otherApplications = applications.filter((a) => a.status !== 'accepted' && a.status !== 'finished');
   const location = formatLocation(project.department_code, project.municipality_code);
 
   return (
@@ -196,6 +211,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
             <ProjectActions
               project={project}
               isOwner={isOwner}
+              hasFinishedApplications={hasFinishedApplications}
               isAuthenticated={isAuthenticated}
               hasApplied={hasApplied}
               userApplication={userApplication}
@@ -230,6 +246,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                       )}
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-gray-900">{acceptedApplication.freelancer_name}</p>
+                        <RatingSummary {...ratings.get(acceptedApplication.freelancer_id)} />
                         <p className="text-xs text-gray-500 truncate">{acceptedApplication.freelancer_email}</p>
                       </div>
                     </div>
@@ -241,6 +258,45 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                     )}
                   </div>
                   <p className="text-sm text-gray-600 whitespace-pre-wrap mt-3">{acceptedApplication.proposal}</p>
+                </div>
+              )}
+
+              {finishedApplications.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Contrataciones finalizadas</h3>
+                  <div className="space-y-3">
+                    {finishedApplications.map((app) => (
+                      <div key={app.id} className="p-4 bg-blue-50/40 rounded-xl border border-blue-100">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900">{app.freelancer_name}</p>
+                            <RatingSummary {...ratings.get(app.freelancer_id)} />
+                            {app.finished_at && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Finalizado el {new Date(app.finished_at).toLocaleDateString('es-CO')}
+                              </p>
+                            )}
+                          </div>
+                          <FinishedEngagementReview
+                            applicationId={app.id}
+                            contractorName={app.freelancer_name}
+                            rating={app.review_rating}
+                            comment={app.review_comment}
+                          />
+                        </div>
+                        {app.review_rating ? (
+                          <div className="mt-2">
+                            <StarsDisplay rating={app.review_rating} />
+                            {app.review_comment && (
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap mt-1">{app.review_comment}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-gray-400 mt-2">Sin calificar todavía</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -261,6 +317,7 @@ export default async function ProjectDetailPage({ params }: ProjectDetailPagePro
                           )}
                           <div>
                             <p className="text-sm font-medium text-gray-900">{app.freelancer_name}</p>
+                            <RatingSummary {...ratings.get(app.freelancer_id)} />
                             <p className="text-xs text-gray-400">{app.freelancer_email}</p>
                           </div>
                         </div>

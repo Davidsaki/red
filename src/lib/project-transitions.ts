@@ -54,18 +54,29 @@ export async function finishProjectExecution(
         );
       }
 
-      await client.query(
+      const finished = await client.query(
         `UPDATE applications SET status = 'finished', finished_at = NOW()
-         WHERE project_id = $1 AND status = 'accepted'`,
+         WHERE project_id = $1 AND status = 'accepted'
+         RETURNING id, freelancer_id`,
         [projectId]
       );
+      let finishedApplication: { id: number; freelancerName: string | null } | null = null;
+      if (finished.rows.length > 0) {
+        const nameResult = await client.query('SELECT name FROM users WHERE id = $1', [
+          finished.rows[0].freelancer_id,
+        ]);
+        finishedApplication = {
+          id: finished.rows[0].id,
+          freelancerName: nameResult.rows[0]?.name ?? null,
+        };
+      }
       const updated = await client.query(
         'UPDATE projects SET status = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
         [projectId, target]
       );
 
       await client.query('COMMIT');
-      return NextResponse.json({ success: true, project: updated.rows[0] });
+      return NextResponse.json({ success: true, project: updated.rows[0], finishedApplication });
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;

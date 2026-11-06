@@ -44,12 +44,22 @@ export default async function DashboardPage() {
   // Fetch user-specific data (depends on userId)
   let projects: any[] = [];
   let applicationCount = 0;
+  let pendingReviews: { id: number; project_id: number; project_title: string; freelancer_name: string | null }[] = [];
 
   if (userId) {
-    const [projectsResult, appCountResult, appCountsResult] = await Promise.all([
+    const [projectsResult, appCountResult, appCountsResult, pendingReviewsResult] = await Promise.all([
       sql`SELECT * FROM projects WHERE employer_id = ${userId} ORDER BY created_at DESC`,
       sql`SELECT COUNT(*)::int as count FROM applications WHERE freelancer_id = ${userId}`,
       sql`SELECT project_id, COUNT(*)::int as cnt FROM applications GROUP BY project_id`,
+      sql`
+        SELECT a.id, a.project_id, p.title AS project_title, u.name AS freelancer_name
+        FROM applications a
+        JOIN projects p ON p.id = a.project_id
+        JOIN users u ON u.id = a.freelancer_id
+        LEFT JOIN reviews r ON r.application_id = a.id
+        WHERE p.employer_id = ${userId} AND a.status = 'finished' AND r.id IS NULL
+        ORDER BY a.finished_at DESC
+      `,
     ]);
 
     // Build a map of project_id -> application count
@@ -63,6 +73,7 @@ export default async function DashboardPage() {
       application_count: appCountMap[p.id] || 0,
     }));
     applicationCount = appCountResult.rows[0]?.count || 0;
+    pendingReviews = pendingReviewsResult.rows as typeof pendingReviews;
   }
 
   const projectCount = projects.length;
@@ -94,6 +105,24 @@ export default async function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {pendingReviews.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+            <p className="text-sm font-medium text-yellow-900">
+              Tienes {pendingReviews.length} calificaci{pendingReviews.length !== 1 ? 'ones' : 'ón'} pendiente{pendingReviews.length !== 1 ? 's' : ''}
+            </p>
+            <ul className="mt-2 space-y-1">
+              {pendingReviews.map((item) => (
+                <li key={item.id} className="text-sm text-yellow-800">
+                  {item.freelancer_name ?? 'Contratista'} · {item.project_title}{' '}
+                  <Link href={`/projects/${item.project_id}`} className="font-medium underline hover:text-yellow-900">
+                    Calificar →
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Admin Panel Link */}
         {userRole === 'admin' && (

@@ -146,7 +146,8 @@ describe.each([
     mockQuery
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
       .mockResolvedValueOnce({ rows: [project] })
-      .mockResolvedValueOnce({ rows: [] }) // finish application
+      .mockResolvedValueOnce({ rows: [{ id: 7, freelancer_id: 5 }] }) // finish application
+      .mockResolvedValueOnce({ rows: [{ name: 'Ana' }] }) // contractor name
       .mockResolvedValueOnce({ rows: [{ id: 1, status: target }] });
   }
 
@@ -160,9 +161,25 @@ describe.each([
     const calls = mockQuery.mock.calls;
     expect(String(calls[2][0])).toContain("status = 'finished'");
     expect(String(calls[2][0])).toContain('finished_at = NOW()');
-    expect(calls[3][1]).toEqual([1, target]);
+    expect(calls[2][0]).toContain('RETURNING id, freelancer_id');
+    expect(calls[4][1]).toEqual([1, target]);
+    expect((await res.json()).finishedApplication).toEqual({ id: 7, freelancerName: 'Ana' });
     expect(statements()).toContain('COMMIT');
     expect(mockRelease).toHaveBeenCalled();
+  });
+
+  it('returns finishedApplication null when no application was accepted', async () => {
+    asOwner();
+    mockQuery
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'in_progress' }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: target }] });
+
+    const res = await handler(req(), params);
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).finishedApplication).toBeNull();
   });
 
   it('returns 403 for a non-owner', async () => {

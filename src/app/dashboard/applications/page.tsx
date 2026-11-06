@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { applicationStatusStyle } from '@/lib/status';
+import StarsDisplay from '@/components/StarsDisplay';
 
 interface Application {
   id: number;
@@ -16,6 +17,8 @@ interface Application {
   project_budget: string;
   project_budget_currency: string;
   project_status: string;
+  review_rating: number | null;
+  review_comment: string | null;
 }
 
 function formatCOP(value: number): string {
@@ -406,6 +409,21 @@ function ApplicationsContent() {
                       <div className="mb-3 p-3 bg-green-100 border border-green-200 rounded-lg">
                         <p className="text-sm font-semibold text-green-800">¡Te seleccionaron!</p>
                         <p className="text-xs text-green-700 mt-0.5">El contratante se pondrá en contacto contigo.</p>
+                      </div>
+                    )}
+                    {app.status === 'finished' && (
+                      <div className="mb-3 p-3 bg-blue-50/50 border border-blue-100 rounded-lg">
+                        {app.review_rating ? (
+                          <>
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Calificación recibida</p>
+                            <StarsDisplay rating={app.review_rating} />
+                            {app.review_comment && (
+                              <p className="text-sm text-gray-600 whitespace-pre-wrap mt-1">{app.review_comment}</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-sm text-gray-400">Sin calificar todavía</p>
+                        )}
                       </div>
                     )}
                     {app.status === 'pending' && (

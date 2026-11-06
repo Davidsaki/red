@@ -207,6 +207,21 @@ describe('DELETE /api/projects/[id]', () => {
     expect(data.success).toBe(true);
   });
 
+  it('returns 409 when the project has finished applications', async () => {
+    mockGetServerSession.mockResolvedValue({ user: { email: 'owner@example.com' } });
+    mockSql
+      .mockResolvedValueOnce({ rows: [{ id: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ employer_id: 1, status: 'completed', has_finished: true }] });
+
+    const request = createRequest('http://localhost:3000/api/projects/1', { method: 'DELETE' });
+    const response = await DELETE(request, mockParams);
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toContain('contrataciones finalizadas');
+    expect(mockSql).toHaveBeenCalledTimes(2);
+  });
+
   it('returns 401 without session', async () => {
     mockGetServerSession.mockResolvedValue(null);
 

@@ -99,7 +99,9 @@ Flujo base que debe funcionar sin fricción antes de cualquier otra cosa:
 - **Cómo verificar:** Seleccionar aplicante → llega email → proyecto en
   ejecución → reabrir → elegir a otro aplicante sin que vuelva a aplicar.
 - **Pendiente antes de abrir a usuarios reales:** bloquear aplicar al proyecto
-  propio (hoy se permite a propósito para probar con una sola cuenta).
+  propio (hoy se permite a propósito para probar con una sola cuenta). Al
+  bloquearlo, borrar o excluir del promedio las calificaciones donde el
+  empleador se calificó a sí mismo durante las pruebas.
 
 ### Historia: Calificación del contratista (Fase 3 — oct 2026)
 **Depende de:** Selección del contratista
@@ -117,6 +119,11 @@ Flujo base que debe funcionar sin fricción antes de cualquier otra cosa:
   Una mala calificación no bloquea al contratista, solo baja su promedio.
 - **Cómo verificar:** Completar contratación → aparece formulario de estrellas
   → el promedio se ve en la próxima aplicación de ese contratista.
+- **Mejora futura:** mostrar junto a cada calificación si la contratación
+  terminó con el proyecto *completado* o *reabierto* ("trabajo parcial"),
+  para dar contexto a otros empleadores. Hoy no se distingue (ambos casos
+  quedan como `finished`); se podría derivar del estado del proyecto al
+  finalizar o guardar el motivo en `applications`.
 
 ---
 

@@ -229,7 +229,13 @@ export async function DELETE(
     }
     const userId = userResult.rows[0].id;
 
-    const projectResult = await sql`SELECT employer_id, status FROM projects WHERE id = ${projectId}`;
+    const projectResult = await sql`
+      SELECT employer_id, status,
+        EXISTS (
+          SELECT 1 FROM applications WHERE project_id = ${projectId} AND status = 'finished'
+        ) AS has_finished
+      FROM projects WHERE id = ${projectId}
+    `;
     if (projectResult.rows.length === 0) {
       return NextResponse.json({ success: false, error: 'Proyecto no encontrado' }, { status: 404 });
     }
@@ -238,6 +244,10 @@ export async function DELETE(
     }
     if (projectResult.rows[0].status === 'in_progress') {
       return NextResponse.json({ success: false, error: 'No puedes eliminar un proyecto en ejecución; complétalo o reábrelo primero' }, { status: 409 });
+    }
+
+    if (projectResult.rows[0].has_finished) {
+      return NextResponse.json({ success: false, error: 'Este proyecto tiene contrataciones finalizadas y no se puede eliminar; puedes cerrarlo.' }, { status: 409 });
     }
 
     // Delete associated applications first, then the project

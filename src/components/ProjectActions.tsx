@@ -7,7 +7,9 @@ import EditProjectModal from './EditProjectModal';
 import ProjectCloseButton from './ProjectCloseButton';
 import ProjectDeleteButton from './ProjectDeleteButton';
 import Modal from './Modal';
-import ProjectExecutionActions from './ProjectExecutionActions';
+import ProjectExecutionActions, { type FinishedApplication } from './ProjectExecutionActions';
+import ReviewModal from './ReviewModal';
+import StarsDisplay from './StarsDisplay';
 import { applicationStatusStyle } from '@/lib/status';
 
 interface UserApplication {
@@ -16,6 +18,8 @@ interface UserApplication {
   bid: string | null;
   status: string;
   created_at: string;
+  review_rating?: number | null;
+  review_comment?: string | null;
 }
 
 interface ProjectActionsProps {
@@ -33,6 +37,7 @@ interface ProjectActionsProps {
     municipality_code?: string | null;
   };
   isOwner: boolean;
+  hasFinishedApplications?: boolean;
   isAuthenticated: boolean;
   hasApplied: boolean;
   userApplication?: UserApplication | null;
@@ -58,12 +63,13 @@ function formatCOPInput(value: number | string): string {
   return new Intl.NumberFormat('es-CO').format(num);
 }
 
-export default function ProjectActions({ project, isOwner, isAuthenticated, hasApplied, userApplication }: ProjectActionsProps) {
+export default function ProjectActions({ project, isOwner, hasFinishedApplications, isAuthenticated, hasApplied, userApplication }: ProjectActionsProps) {
   const router = useRouter();
   const [showApply, setShowApply] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [showEditApp, setShowEditApp] = useState(false);
   const [isDeletingApp, setIsDeletingApp] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<FinishedApplication | null>(null);
 
   // Edit application state
   const [editProposal, setEditProposal] = useState(userApplication?.proposal || '');
@@ -170,6 +176,22 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
               </div>
             )}
 
+            {userApplication.status === 'finished' && (
+              <div className="mb-3 p-3 bg-white border border-blue-100 rounded-lg">
+                {userApplication.review_rating ? (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Calificación recibida</p>
+                    <StarsDisplay rating={userApplication.review_rating} />
+                    {userApplication.review_comment && (
+                      <p className="text-sm text-gray-600 whitespace-pre-wrap mt-1">{userApplication.review_comment}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-400">Sin calificar todavía</p>
+                )}
+              </div>
+            )}
+
             <p className="text-sm text-gray-600 line-clamp-3 mb-2">{userApplication.proposal}</p>
 
             {userApplication.bid && (
@@ -226,12 +248,12 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
               Editar
             </button>
             {project.status === 'in_progress' && (
-              <ProjectExecutionActions projectId={project.id} />
+              <ProjectExecutionActions projectId={project.id} onFinished={setReviewTarget} />
             )}
             {project.status === 'open' && (
               <ProjectCloseButton projectId={project.id} />
             )}
-            {project.status !== 'in_progress' && (
+            {project.status !== 'in_progress' && !hasFinishedApplications && (
               <ProjectDeleteButton projectId={project.id} />
             )}
           </div>
@@ -239,6 +261,15 @@ export default function ProjectActions({ project, isOwner, isAuthenticated, hasA
       )}
 
       {/* Modals */}
+      {reviewTarget && (
+        <ReviewModal
+          isOpen
+          onClose={() => setReviewTarget(null)}
+          applicationId={reviewTarget.id}
+          contractorName={reviewTarget.freelancerName}
+        />
+      )}
+
       <ApplyModal
         isOpen={showApply}
         onClose={() => setShowApply(false)}

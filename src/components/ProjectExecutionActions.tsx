@@ -4,8 +4,14 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from './Modal';
 
+export interface FinishedApplication {
+  id: number;
+  freelancerName: string | null;
+}
+
 interface ProjectExecutionActionsProps {
   projectId: number;
+  onFinished?: (application: FinishedApplication) => void;
 }
 
 type Action = 'complete' | 'reopen';
@@ -25,7 +31,7 @@ const COPY: Record<Action, { title: string; body: string; confirm: string; loadi
   },
 };
 
-export default function ProjectExecutionActions({ projectId }: ProjectExecutionActionsProps) {
+export default function ProjectExecutionActions({ projectId, onFinished }: ProjectExecutionActionsProps) {
   const router = useRouter();
   const [action, setAction] = useState<Action | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,6 +54,7 @@ export default function ProjectExecutionActions({ projectId }: ProjectExecutionA
         return;
       }
       setAction(null);
+      if (data.finishedApplication) onFinished?.(data.finishedApplication);
       router.refresh();
     } catch {
       setError('Error al actualizar el proyecto');

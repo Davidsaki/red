@@ -99,9 +99,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     const result = await sql`
       SELECT a.*, p.title as project_title, p.budget as project_budget,
-             p.budget_currency as project_budget_currency, p.status as project_status
+             p.budget_currency as project_budget_currency, p.status as project_status,
+             r.rating AS review_rating, r.comment AS review_comment
       FROM applications a
       JOIN projects p ON a.project_id = p.id
+      LEFT JOIN reviews r ON r.application_id = a.id
       WHERE a.freelancer_id = ${userId}
       ORDER BY a.created_at DESC
     `;
