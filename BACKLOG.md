@@ -1,7 +1,54 @@
 # RED — Backlog de Ideas y Pendientes
 
 Archivo de notas vivas. Se actualiza en cada sesión de trabajo.
-Última actualización: agosto 2026
+Última actualización: noviembre 2026
+
+---
+
+## Camino al lanzamiento del MVP (prioridades acordadas — nov 2026)
+
+### 1. Bloqueantes — antes de abrir a usuarios reales
+- [ ] **Bloquear aplicar al proyecto propio** y borrar/excluir las
+      autocalificaciones hechas durante las pruebas (ver Historia de selección).
+- [ ] **Rotar la credencial de producción filtrada** (`red-db`). No es
+      autoservicio: ni Vercel ni la consola de Prisma permiten rotar la
+      connection string por defecto. Requiere contactar soporte de
+      Prisma/Vercel (o recrear la base, con pérdida de datos).
+- [ ] **Robustez del pool de conexiones** (`src/lib/db.ts`): manejador
+      `pool.on('error')`, `idleTimeoutMillis` y `keepAlive`. Hoy un corte de
+      red deja conexiones muertas y un error en una conexión inactiva puede
+      tumbar el servidor.
+- [ ] **Términos y política de privacidad** (Ley 1581 de 2012, habeas data):
+      páginas legales + checkbox de aceptación en el registro. Revisar el
+      texto con alguien que sepa del tema.
+
+### 2. Lo que más falta para que la gente lo use
+- [ ] **Contacto por WhatsApp tras seleccionar:** botón que aparece solo
+      después de la selección, con el número que cada parte acepte compartir.
+      Más barato y más natural en Colombia que un chat propio.
+- [ ] **Aviso al empleador cuando alguien aplica** (correo vía Resend).
+- [ ] **Perfil del contratista:** foto, habilidades, zona, calificaciones y
+      trabajos realizados — sin perfil las estrellas pierden fuerza.
+- [ ] **Pasada mobile-first:** revisar todos los flujos en pantalla de celular.
+
+### 3. Negociación de precio
+- [ ] **"Precio acordado" al seleccionar:** el empleador lo escribe al
+      seleccionar (prellenado con la oferta del contratista) y queda
+      registrado en la contratación. La negociación en sí pasa por WhatsApp.
+- [ ] (Más adelante, si los usuarios lo piden) contraofertas de ida y vuelta
+      dentro de la app.
+
+### 4. Feedback de usuarios
+- [ ] **Botón "Danos tu opinión"** siempre visible: guarda el mensaje en la
+      base y avisa por correo.
+- [ ] **Pregunta tipo NPS** después de calificar: "¿Qué tan probable es que
+      recomiendes RED?" (0–10) + comentario opcional.
+- [ ] **Analítica de embudo:** dónde abandona la gente (empieza a publicar y
+      no termina; ve un proyecto y no aplica). Vercel Analytics como base;
+      si se suma una herramienta con grabación de sesiones, declararlo en la
+      política de privacidad.
+- [ ] **Hablar con los primeros 10–20 usuarios** (p. ej. grupo de WhatsApp) —
+      ninguna herramienta reemplaza eso al principio.
 
 ---
 
@@ -9,28 +56,19 @@ Archivo de notas vivas. Se actualiza en cada sesión de trabajo.
 
 Flujo base que debe funcionar sin fricción antes de cualquier otra cosa:
 
-- [ ] Freelancers pueden ver proyectos y aplicar sin fricción end-to-end
-- [ ] Flujo completo: empleador publica → recibe propuestas → acepta una
-- [ ] Notificaciones cuando alguien aplica a un proyecto
-- [ ] Notificación cuando una propuesta es aceptada/rechazada
+- [x] Freelancers pueden ver proyectos y aplicar sin fricción end-to-end
+- [x] Flujo completo: empleador publica → recibe propuestas → selecciona una (Fase 2, nov 2026)
+- [ ] Notificaciones cuando alguien aplica a un proyecto (ver "Camino al lanzamiento" §2)
+- [x] Notificación cuando una propuesta es seleccionada (los demás aplicantes
+      quedan en espera, no se rechazan — decisión de la Fase 2)
 
 ---
 
-## Pendiente para activar auth mejorado en producción
+## Auth mejorado en producción — completado (sep 2026)
 
-> Código ya implementado y listo. Solo faltan estos pasos externos para que funcione en Vercel.
-
-- [ ] **Resend** — ya tienes cuenta. Regenerar API key (la anterior fue compartida en chat).
-      Luego verificar dominio `reddecontratistas.com` en resend.com → Domains.
-      Requiere agregar registros DNS en el panel de tu registrador (cPanel / GoDaddy / etc).
-      Variables a agregar en Vercel: `RESEND_API_KEY` y `EMAIL_FROM=RED <noreply@reddecontratistas.com>`
-
-- [ ] **Cloudflare Turnstile** — crear sitio en dash.cloudflare.com/turnstile con dominio `reddecontratistas.com`.
-      Variables a agregar en Vercel: `NEXT_PUBLIC_TURNSTILE_SITE_KEY` y `TURNSTILE_SECRET_KEY`
-
-- [ ] **Inicializar BD** — una vez hecho el deploy con las nuevas variables, correr:
-      `curl -H "x-init-secret: TU_INIT_DB_SECRET" https://reddecontratistas.com/api/init-db`
-      Esto crea las tablas `email_verification_tokens`, `magic_link_tokens` y la columna `email_verified`.
+- [x] **Resend** — dominio `reddecontratistas.com` verificado, `RESEND_API_KEY` y `EMAIL_FROM` en Vercel.
+- [x] **Cloudflare Turnstile** — activo y obligatorio en registro, login y magic link.
+- [x] **Esquema de BD** — ahora se maneja con migraciones (`npm run migrate:prod`), ya no con `/api/init-db`.
 
 ---
 
@@ -181,11 +219,11 @@ No requiere modelo pesado — embeddings con pgvector (extensión de Postgres).
 ## Features Futuras (sin prioridad aún)
 
 - [ ] Notificaciones en tiempo real (WebSockets o Server-Sent Events)
-- [ ] Magic links — login sin contraseña vía Resend o SendGrid
+- [x] Magic links — login sin contraseña vía Resend (sep 2026)
 - [ ] Subida de archivos — avatares de usuario e imágenes de proyectos
 - [ ] Búsqueda full-text avanzada (PostgreSQL FTS)
 - [ ] Panel de admin completo
-- [ ] Rate limiting en API routes
+- [x] Rate limiting en API routes (Upstash, sep 2026 — register/login/magic-link)
 - [ ] Integración de pagos Stripe — suscripción premium
 - [ ] Analytics para empleadores (vistas, postulaciones, conversión)
 
